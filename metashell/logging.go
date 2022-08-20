@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 var log *Logger
@@ -22,7 +22,7 @@ type Logger struct {
 	component string
 	dir       string
 
-	*logrus.Logger
+	zerolog.Logger
 	sync.Mutex
 }
 
@@ -54,9 +54,10 @@ func (l *Logger) init(root, component string) error {
 	}
 
 	l.component = component
-
-	l.Logger = logrus.New()
-	l.Logger.SetOutput(l)
+	l.Logger = zerolog.New(l).
+		With().
+		Str("component", l.component).
+		Logger()
 
 	return nil
 }

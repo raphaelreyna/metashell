@@ -36,8 +36,8 @@ func (sc *shellClient) parseFlags() {
 func (sc *shellClient) Run(ctx context.Context) error {
 	sc.parseFlags()
 
-	log.Infof("shell client running with: %+v\n", *sc)
-	log.Infof("shell client running with os args: %+v\n", os.Args)
+	logEvent := log.Info().
+		Strs("args", os.Args)
 
 	var (
 		runRecordExitCode     = -1 < sc.exitCode && sc.cmdKey != ""
@@ -48,10 +48,10 @@ func (sc *shellClient) Run(ctx context.Context) error {
 	case runPreRunQueryRequest && runRecordExitCode:
 		break
 	case runPreRunQueryRequest:
-		log.Info("prerunquery")
+		logEvent.Str("mode", "preRunQuery").Msg("ran")
 		return sc.requestID(ctx)
 	case runRecordExitCode:
-		log.Info("report")
+		logEvent.Str("mode", "postRunReport").Msg("ran")
 		return sc.recordExitCode(ctx)
 	}
 

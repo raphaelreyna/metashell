@@ -72,7 +72,11 @@ func (ms *metaShell) stop() {
 func (ms *metaShell) run(ctx context.Context) error {
 	ctx, ms.cancelCtx = context.WithCancel(ctx)
 
-	var err error
+	err := ms.ensureDaemon(ctx)
+	if err != nil {
+		return err
+	}
+
 	ms.grpcConn, err = grpc.Dial("unix://"+ms.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -101,10 +105,12 @@ func (ms *metaShell) run(ctx context.Context) error {
 	go func() {
 		var err error
 		for {
-			log.Info("receoved exit code")
+			log.Info().Msg("received exit code")
 			_, err = ms.ecStream.Recv()
 			if err != nil {
-				log.Errorf("error reading from exit code stream: %v", err)
+				log.Error().
+					Err(err).
+					Msg("error reading from exit code stream")
 				return
 			}
 			ms.Lock()
@@ -178,25 +184,24 @@ func (ms *metaShell) start(ctx context.Context) {
 		ms.RLock()
 		cmdIsRunning := ms.cmdIsRunning
 		ms.RUnlock()
-		log.Infof("just scanned, cmd is running? %v", cmdIsRunning)
 
 		input := ms.scanner.Bytes()
 		if !cmdIsRunning {
 			switch input[0] {
 			case 27: // ESC
-				log.Println("ESC")
+				log.Info().Msg("ESC")
 			case 13: // \n
-				log.Infof("registering")
-				key, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
+				log.Info().Msg("registering")
+				_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
 					Command:   ms.cmdBuffer,
 					Tty:       ms.tty,
 					Timestamp: time.Now().Unix(),
 				})
 				if err != nil {
-					log.Errorf("error registering command with daemon: %v", err)
+					log.Error().
+						Err(err).
+						Msg("error registering command with daemon")
 				}
-
-				log.Infof("got key: %s", key)
 
 				ms.cmdBuffer = ""
 				ms.Lock()
@@ -256,4 +261,23 @@ func setTTYSettings(fd int) (*unix.Termios, error) {
 func restoreTTYSettings(fd int, old *unix.Termios) error {
 	const ioctlWriteTermios = unix.TCSETS
 	return unix.IoctlSetTermios(fd, ioctlWriteTermios, old)
+}
+
+func (ms *metaShell) ensureDaemon(ctx context.Context) error {
+	_, err := os.Stat(ms.socketPath)
+	if err == nil {
+		return nil
+	}
+
+	if !os.IsNotExist(err) {
+		return err
+	}
+
+	cmd := exec.Command(os.Args[0], "daemon")
+	_, err = cmd.CombinedOutput()
+	if err == nil {
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return err
 }

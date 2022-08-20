@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -49,13 +51,26 @@ type daemon struct {
 }
 
 func (d *daemon) termHandler(sig os.Signal) error {
+	log.Info().
+		Str("signal", sig.String()).
+		Msg("handling termination on signal")
 	d.grpcServer.GracefulStop()
-	d.listener.Close()
-	os.Remove(d.socketPath)
+	log.Info().Msg("stopped gRPC server")
+	if err := d.listener.Close(); err != nil {
+		if !strings.Contains(err.Error(), "use of closed network connection") {
+			log.Error().
+				Err(err).
+				Msg("error closing unix socket listener")
+		} else {
+			log.Info().Msg("closed unix socket listener")
+		}
+	} else {
+		log.Info().Msg("closed unix socket listener")
+	}
 	return nil
 }
 
-func (d *daemon) Run(ctx context.Context) error {
+func (d *daemon) run(ctx context.Context) error {
 	d.cks = &cmdKeyService{}
 	d.exitCodeStreamChans = make(map[string]chan exitCode)
 
@@ -68,8 +83,6 @@ func (d *daemon) Run(ctx context.Context) error {
 		Umask:       027,
 	}
 
-	godaemon.SetSigHandler(d.termHandler, os.Kill, syscall.SIGQUIT, syscall.SIGTERM)
-
 	dd, err := cntxt.Reborn()
 	if err != nil {
 		return err
@@ -80,6 +93,13 @@ func (d *daemon) Run(ctx context.Context) error {
 	defer cntxt.Release()
 
 	// start of daemon
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		d.termHandler(sig)
+	}()
+
 	if _, err := os.Stat(d.socketPath); err == nil {
 		if err := os.Remove(d.socketPath); err != nil {
 			return err
@@ -117,31 +137,35 @@ func (d *daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellD
 		return fmt.Errorf("no tty given in metadata")
 	}
 
-	log.Infof("registered new tty: %s", tty)
+	log.Info().
+		Str("tty", tty).
+		Msg("registered new tty")
 	d.exitCodeStreamChans[tty] = ceChan
-	log.Infof("registered new tty: %s", tty)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case ce := <-ceChan:
-			log.Info("got exit code via chan, sending via grpc")
+			log.Info().
+				Msg("got exit code via chan, sending via grpc")
 			err := server.Send(&daemonproto.CommandExitCode{
 				Key:      ce.key,
 				ExitCode: int32(ce.code),
 			})
 			if err != nil {
-				log.Errorf("error sending command exit code: %v", err)
+				log.Error().Err(err).
+					Msg("error sending command exit code")
 				return err
 			}
-			log.Info("sent exit code over grpc")
+			log.Info().
+				Msg("sent exit code over grpc")
 		}
 	}
 }
 
 func (d *daemon) RegisterCommandEntry(ctx context.Context, req *daemonproto.CommandEntry) (*daemonproto.CommandKey, error) {
-	log.Println("RegisterCommandEntry")
+	log.Info().Msg("RegisterCommandEntry")
 
 	key := d.cks.registerVector(&vector{
 		command:   req.Command,
@@ -153,7 +177,7 @@ func (d *daemon) RegisterCommandEntry(ctx context.Context, req *daemonproto.Comm
 }
 
 func (d *daemon) PreRunQuery(ctx context.Context, req *daemonproto.PreRunQueryRequest) (*daemonproto.PreRunQueryResponse, error) {
-	log.Println("PreRunQuery")
+	log.Info().Msg("PreRunQuery")
 
 	k := d.cks.getKey(&vector{
 		command:   req.Command,
@@ -169,43 +193,45 @@ func (d *daemon) PreRunQuery(ctx context.Context, req *daemonproto.PreRunQueryRe
 }
 
 func (d *daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunReportRequest) (*empty.Empty, error) {
-	log.Println("PostRunReport")
+	log.Info().Msg("PostRunReport")
 
 	if req.Uuid == "INIT" {
-		log.Info("got INIT")
+		log.Debug().Msg("got INIT")
 		return &empty.Empty{}, nil
 	}
 
 	v := d.cks.exchangeKey(req.Uuid)
 	if v == nil {
-		log.Warnf("could not find vector for key: %s", req.Uuid)
+		log.Warn().
+			Str("key", req.Uuid).
+			Msg("could not find vector for key")
 		return &empty.Empty{}, nil
 	}
 
 	go func() {
 		ecChan, exists := d.exitCodeStreamChans[v.tty]
 		if !exists {
-			log.Warnf("got post run report for a non connected tty: %v", v.tty)
+			log.Warn().
+				Str("tty", v.tty).
+				Msg("got post run report for a non-connected tty")
 			return
 		}
 
-		log.Infof("sending exit code via chan")
 		ecChan <- exitCode{
 			key:  req.Uuid,
 			code: int(req.ExitCode),
 		}
-		log.Infof("sent exit code via chan")
 	}()
 
 	go func() {
 		ctx = context.WithValue(ctx, stdoutKey{}, log)
-		log.Info("running hook")
+		log.Debug().Msg("running hook")
 		d.postRunReportHandler(ctx, &PostRunReport{
 			TTY:       v.tty,
 			Command:   v.command,
 			Timestamp: v.timestamp,
 		})
-		log.Info("ran hook")
+		log.Debug().Msg("ran hook")
 	}()
 
 	return &empty.Empty{}, nil

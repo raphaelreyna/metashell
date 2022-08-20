@@ -25,7 +25,7 @@ func Init(ctx context.Context, ib *InitBundle) error {
 		err        error
 	)
 	if err := initLogging(rootDir, subcommand); err != nil {
-		panic(err)
+		return fmt.Errorf("error initializing logging: %v", err)
 	}
 
 	socketPath := filepath.Join(rootDir, "daemon", "daemon.socket")
@@ -39,8 +39,8 @@ func Init(ctx context.Context, ib *InitBundle) error {
 			workDir:              filepath.Join(rootDir, "daemon"),
 			pidFileName:          filepath.Join(rootDir, "daemon", "daemon.pid"),
 		}
-		log.Info("starting daemon")
-		err = d.Run(ctx)
+		log.Info().Msg("starting daemon")
+		err = d.run(ctx)
 	case "shellclient":
 		sc := shellClient{
 			SocketPath: socketPath,
@@ -74,6 +74,15 @@ func Init(ctx context.Context, ib *InitBundle) error {
 			shellClientPath: execPath,
 		}
 		err = i.run(ctx)
+	case "client":
+		d := client{
+			socketPath:           socketPath,
+			postRunReportHandler: ib.PostRunReportHandlerFunc,
+			logFileName:          log.out.Name(),
+			workDir:              filepath.Join(rootDir, "daemon"),
+			pidFileName:          filepath.Join(rootDir, "daemon", "daemon.pid"),
+		}
+		err = d.run(ctx)
 	default:
 		err = fmt.Errorf("invalid subcommand")
 	}
