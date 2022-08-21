@@ -1,0 +1,50 @@
+syntax = "proto3";
+package shelld.daemon;
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/raphaelreyna/shelld/rpc/daemon";
+
+service ShellclientDaemon {
+    rpc PreRunQuery(PreRunQueryRequest) returns (PreRunQueryResponse);
+    rpc PostRunReport(PostRunReportRequest) returns (google.protobuf.Empty);
+}
+
+message PreRunReportResponse {
+    string cmd_key = 1;
+}
+
+message PreRunQueryRequest {
+    string command = 1;
+    string tty = 2;
+    int64 timestamp = 3;
+}
+
+message PreRunQueryResponse {
+    string uuid = 1;
+}
+
+message PostRunReportRequest {
+    string uuid = 1;
+    int32 exit_code = 2;
+}
+
+service MetashellDaemon {
+    rpc NewExitCodeStream(google.protobuf.Empty) returns (stream CommandExitCode);
+    rpc RegisterCommandEntry(CommandEntry) returns (CommandKey);
+}
+
+
+message CommandEntry {
+    string command = 1;
+    string tty = 2;
+    int64 timestamp = 3;
+}
+
+message CommandKey {
+    string key = 1;
+}
+
+message CommandExitCode {
+    string key = 1;
+    int32 exit_code = 2;
+}

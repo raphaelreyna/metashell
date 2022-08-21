@@ -1,0 +1,15 @@
+syntax = "proto3";
+package proto;
+
+message CommandReport {
+    string command = 1;
+    string tty = 2;
+    uint64 timestamp = 3;
+    int32 exit_code = 4;
+}
+
+message Empty {}
+
+service CommandReportHandler {
+    rpc ReportCommand(CommandReport) returns (Empty);
+}
