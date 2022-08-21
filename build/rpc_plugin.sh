@@ -1,0 +1,1 @@
+protoc --proto_path=plugin/proto --go_out=plugin --go_opt=Mplugin.proto=/proto --go-grpc_out=plugin --go-grpc_opt=Mplugin.proto=/proto plugin/proto/plugin.proto

@@ -6,11 +6,14 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/hashicorp/go-plugin"
+	"github.com/raphaelreyna/shelld/plugin/proto/shared"
 	daemonproto "github.com/raphaelreyna/shelld/rpc/go/daemon"
 	godaemon "github.com/sevlyar/go-daemon"
 	"google.golang.org/grpc"
@@ -46,8 +49,105 @@ type daemon struct {
 	cks                 *cmdKeyService
 	exitCodeStreamChans map[string]chan exitCode
 
+	plugins *plugins
+
 	daemonproto.UnimplementedMetashellDaemonServer
 	daemonproto.UnimplementedShellclientDaemonServer
+}
+
+type plugins struct {
+	clients               []*plugin.Client
+	commandReportHandlers []shared.CommandReportHandler
+}
+
+func (p *plugins) init(ctx context.Context, pluginDir string) error {
+	log.Info().
+		Str("dir", pluginDir).
+		Msg("loading plugins")
+
+	entries, err := os.ReadDir(pluginDir)
+	if err != nil {
+		return fmt.Errorf("error reading plugin dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		log.Info().
+			Str("path", entry.Name()).
+			Msg("checking plugin file")
+
+		client := plugin.NewClient(&plugin.ClientConfig{
+			HandshakeConfig: shared.Handshake,
+			Plugins:         shared.PluginMap,
+			Cmd:             exec.Command(entry.Name()),
+			AllowedProtocols: []plugin.Protocol{
+				plugin.ProtocolGRPC,
+			},
+		})
+
+		cc, err := client.Client()
+		if err != nil {
+			return fmt.Errorf("error opening plugin client: %s: %w", entry.Name(), err)
+		}
+
+		iface, err := cc.Dispense("commandReportHandler")
+		if err != nil {
+			log.Info().
+				Str("path", entry.Name()).
+				Err(err).
+				Msg("skipping plugin")
+			continue
+		}
+
+		h, ok := iface.(shared.CommandReportHandler)
+		if !ok {
+			log.Info().
+				Str("path", entry.Name()).
+				Msg("checking plugin file")
+			continue
+		}
+
+		p.clients = append(p.clients, client)
+		p.commandReportHandlers = append(p.commandReportHandlers, h)
+
+		log.Info().
+			Str("path", entry.Name()).
+			Msg("loaded plugin")
+	}
+
+	log.Info().
+		Int("client_count", len(p.clients)).
+		Int("commandReportHandler_count", len(p.commandReportHandlers)).
+		Msg("finished loading plugins")
+
+	return nil
+}
+
+func (p *plugins) CommandReport(ctx context.Context, cmd string) error {
+	if len(p.commandReportHandlers) == 0 {
+		return nil
+	}
+
+	for _, h := range p.commandReportHandlers {
+		h.ReportCommand(ctx, cmd)
+	}
+
+	return nil
+}
+
+func (p *plugins) Close() error {
+	if len(p.clients) == 0 {
+		return nil
+	}
+
+	for _, c := range p.clients {
+		c.Kill()
+	}
+
+	return nil
 }
 
 func (d *daemon) termHandler(sig os.Signal) error {
@@ -66,6 +166,10 @@ func (d *daemon) termHandler(sig os.Signal) error {
 		}
 	} else {
 		log.Info().Msg("closed unix socket listener")
+	}
+	if err := d.plugins.Close(); err != nil {
+		log.Error().Err(err).
+			Msg("error closing plugins")
 	}
 	return nil
 }
@@ -110,6 +214,11 @@ func (d *daemon) run(ctx context.Context) error {
 		if err := os.Remove(d.socketPath); err != nil {
 			return err
 		}
+	}
+
+	d.plugins = &plugins{}
+	if err := d.plugins.init(ctx, "/home/rr/plugins"); err != nil {
+		return err
 	}
 
 	d.listener, err = net.Listen("unix", d.socketPath)
@@ -226,11 +335,7 @@ func (d *daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 	go func() {
 		ctx = context.WithValue(ctx, stdoutKey{}, log)
 		log.Debug().Msg("running hook")
-		d.postRunReportHandler(ctx, &PostRunReport{
-			TTY:       v.tty,
-			Command:   v.command,
-			Timestamp: v.timestamp,
-		})
+		d.plugins.CommandReport(ctx, v.command)
 		log.Debug().Msg("ran hook")
 	}()
 

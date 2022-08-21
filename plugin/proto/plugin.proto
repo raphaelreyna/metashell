@@ -1,0 +1,12 @@
+syntax = "proto3";
+package proto;
+
+message CommandReport {
+    string command = 1;
+}
+
+message Empty {}
+
+service CommandReportHandler {
+    rpc ReportCommand(CommandReport) returns (Empty);
+}

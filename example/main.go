@@ -11,7 +11,7 @@ func main() {
 	var (
 		ctx    = context.Background()
 		bundle = metashell.InitBundle{
-			RootDir: "/home/rr/shwr/_test",
+			RootDir: "/home/rr/code/metashell/_test",
 			Shell:   "/bin/bash",
 			PostRunReportHandlerFunc: func(ctx context.Context, prr *metashell.PostRunReport) error {
 				out := metashell.GetStdout(ctx)
