@@ -25,8 +25,7 @@ import (
 )
 
 type MetaShell struct {
-	ShellPath  string
-	SocketPath string
+	config Config
 
 	cmd           *exec.Cmd
 	ptmx          *os.File
@@ -79,7 +78,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 		return err
 	}
 
-	ms.grpcConn, err = grpc.Dial("unix://"+ms.SocketPath,
+	ms.grpcConn, err = grpc.Dial("unix://"+ms.config.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -87,7 +86,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 	}
 	defer ms.grpcConn.Close()
 
-	ms.cmd = exec.CommandContext(ctx, ms.ShellPath)
+	ms.cmd = exec.CommandContext(ctx, ms.config.ShellPath)
 	ptmx, err := pty.Start(ms.cmd)
 	if err != nil {
 		return err
@@ -266,7 +265,7 @@ func restoreTTYSettings(fd int, old *unix.Termios) error {
 }
 
 func (ms *MetaShell) ensureDaemon(ctx context.Context) error {
-	_, err := os.Stat(ms.SocketPath)
+	_, err := os.Stat(ms.config.socketPath)
 	if err == nil {
 		return nil
 	}

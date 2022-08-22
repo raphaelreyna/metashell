@@ -10,10 +10,7 @@ import (
 )
 
 type Client struct {
-	SocketPath  string
-	PidFileName string
-	LogFileName string
-	WorkDir     string
+	config Config
 
 	process *os.Process
 }
@@ -23,11 +20,11 @@ func (c *Client) Run(ctx context.Context) error {
 		err   error
 		arg   string
 		cntxt = godaemon.Context{
-			PidFileName: c.PidFileName,
+			PidFileName: c.config.pidFileName,
 			PidFilePerm: 0644,
-			LogFileName: c.LogFileName,
+			LogFileName: c.config.logFileName,
 			LogFilePerm: 0640,
-			WorkDir:     c.WorkDir,
+			WorkDir:     c.config.workDir,
 			Umask:       027,
 		}
 	)

@@ -5,17 +5,13 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/hashicorp/go-plugin"
 	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
 	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto/shared"
 	godaemon "github.com/sevlyar/go-daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -40,10 +36,7 @@ type exitCode struct {
 }
 
 type Daemon struct {
-	SocketPath  string
-	PidFileName string
-	LogFileName string
-	WorkDir     string
+	config Config
 
 	listener   net.Listener
 	grpcServer *grpc.Server
@@ -55,107 +48,6 @@ type Daemon struct {
 
 	daemonproto.UnimplementedMetashellDaemonServer
 	daemonproto.UnimplementedShellclientDaemonServer
-}
-
-type plugins struct {
-	clients               []*plugin.Client
-	commandReportHandlers []shared.CommandReportHandler
-}
-
-func (p *plugins) init(ctx context.Context, pluginDir string) error {
-	Log.Info().
-		Str("dir", pluginDir).
-		Msg("loading plugins")
-
-	entries, err := os.ReadDir(pluginDir)
-	if err != nil {
-		return fmt.Errorf("error reading plugin dir: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		path := filepath.Join(pluginDir, entry.Name())
-
-		Log.Info().
-			Str("path", path).
-			Msg("checking plugin file")
-
-		client := plugin.NewClient(&plugin.ClientConfig{
-			HandshakeConfig: shared.Handshake,
-			Plugins:         shared.PluginMap,
-			Cmd:             exec.Command(path),
-			AllowedProtocols: []plugin.Protocol{
-				plugin.ProtocolGRPC,
-			},
-		})
-
-		cc, err := client.Client()
-		if err != nil {
-			return fmt.Errorf("error opening plugin client: %s: %w", path, err)
-		}
-
-		iface, err := cc.Dispense("commandReportHandler")
-		if err != nil {
-			Log.Info().
-				Str("path", path).
-				Err(err).
-				Msg("skipping plugin")
-			continue
-		}
-
-		h, ok := iface.(shared.CommandReportHandler)
-		if !ok {
-			Log.Info().
-				Str("path", path).
-				Msg("could not cast plugin as commandReportHandler")
-			continue
-		}
-
-		p.clients = append(p.clients, client)
-		p.commandReportHandlers = append(p.commandReportHandlers, h)
-
-		Log.Info().
-			Str("path", path).
-			Msg("loaded plugin")
-	}
-
-	Log.Info().
-		Int("client_count", len(p.clients)).
-		Int("commandReportHandler_count", len(p.commandReportHandlers)).
-		Msg("finished loading plugins")
-
-	return nil
-}
-
-func (p *plugins) CommandReport(ctx context.Context, rep *proto.CommandReport) error {
-	if len(p.commandReportHandlers) == 0 {
-		Log.Info().Msg("no commandReportHandler plugins")
-		return nil
-	}
-
-	for _, h := range p.commandReportHandlers {
-		if err := h.ReportCommand(ctx, rep); err != nil {
-			Log.Error().Err(err).
-				Msg("commandReportHandler plugin error")
-		}
-	}
-
-	return nil
-}
-
-func (p *plugins) Close() error {
-	if len(p.clients) == 0 {
-		return nil
-	}
-
-	for _, c := range p.clients {
-		c.Kill()
-	}
-
-	return nil
 }
 
 func (d *Daemon) termHandler(sig os.Signal) error {
@@ -187,11 +79,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.exitCodeStreamChans = make(map[string]chan exitCode)
 
 	cntxt := &godaemon.Context{
-		PidFileName: d.PidFileName,
+		PidFileName: d.config.pidFileName,
 		PidFilePerm: 0644,
-		LogFileName: d.LogFileName,
+		LogFileName: d.config.logFileName,
 		LogFilePerm: 0640,
-		WorkDir:     d.WorkDir,
+		WorkDir:     d.config.workDir,
 		Umask:       027,
 	}
 
@@ -212,24 +104,24 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.termHandler(sig)
 	}()
 
-	if _, err := os.Stat(d.SocketPath); err == nil {
-		if err := os.Remove(d.SocketPath); err != nil {
+	if _, err := os.Stat(d.config.socketPath); err == nil {
+		if err := os.Remove(d.config.socketPath); err != nil {
 			return err
 		}
 	}
 
-	if _, err := os.Stat(d.SocketPath); err == nil {
-		if err := os.Remove(d.SocketPath); err != nil {
+	if _, err := os.Stat(d.config.socketPath); err == nil {
+		if err := os.Remove(d.config.socketPath); err != nil {
 			return err
 		}
 	}
 
 	d.plugins = &plugins{}
-	if err := d.plugins.init(ctx, "/home/rr/plugins"); err != nil {
+	if err := d.plugins.init(ctx, d.config.PluginsDir); err != nil {
 		return err
 	}
 
-	d.listener, err = net.Listen("unix", d.SocketPath)
+	d.listener, err = net.Listen("unix", d.config.socketPath)
 	if err != nil {
 		return err
 	}
@@ -342,7 +234,7 @@ func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 
 	go func() {
 		Log.Debug().Msg("running hook")
-		d.plugins.CommandReport(context.TODO(), &proto.CommandReport{
+		d.plugins.commandReport(context.TODO(), &proto.CommandReport{
 			Command:   v.command,
 			Tty:       v.tty,
 			Timestamp: uint64(v.timestamp),

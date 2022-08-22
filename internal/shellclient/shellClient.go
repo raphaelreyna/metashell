@@ -17,7 +17,7 @@ import (
 const SubCommandShellClient = "shellclient"
 
 type ShellClient struct {
-	SocketPath string
+	config Config
 
 	tty      string
 	cmd      string
@@ -65,7 +65,7 @@ func (r *ShellClient) recordExitCode(ctx context.Context) error {
 		panic("exit code not set")
 	}
 
-	conn, err := grpc.Dial("unix://"+r.SocketPath,
+	conn, err := grpc.Dial("unix://"+r.config.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -82,7 +82,7 @@ func (r *ShellClient) recordExitCode(ctx context.Context) error {
 }
 
 func (r *ShellClient) requestID(ctx context.Context) error {
-	conn, err := grpc.Dial("unix://"+r.SocketPath,
+	conn, err := grpc.Dial("unix://"+r.config.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

@@ -43,6 +43,9 @@ func (l *Logger) rotate() error {
 
 	newLogFileName := fmt.Sprintf("%d.log", time.Now().Unix())
 	l.out, err = os.Create(filepath.Join(l.dir, newLogFileName))
+	if err != nil {
+		err = fmt.Errorf("error rotating log file: %w", err)
+	}
 	return err
 }
 
