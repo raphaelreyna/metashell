@@ -26,6 +26,9 @@ func (p *plugins) init(ctx context.Context, pluginDir string) error {
 
 	entries, err := os.ReadDir(pluginDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("error reading plugin dir: %w", err)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	. "github.com/raphaelreyna/shelld/internal/log"
 )
@@ -27,17 +26,11 @@ func run(ctx context.Context) error {
 		err        error
 	)
 
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return fmt.Errorf("could not read config: %w", err)
-	}
-	configPath := filepath.Join(configDir, "metashell", "config.yaml")
-
-	config, err := parseConfig(configPath)
+	config, err := parseConfig()
 	if err != nil {
 		return err
 	}
-	rootDir := config.RootDir
+	rootDir := config.rootDir
 
 	if err := SetLog(rootDir, subcommand); err != nil {
 		return fmt.Errorf("error initializing logging: %v", err)

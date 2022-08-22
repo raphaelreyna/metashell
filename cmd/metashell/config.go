@@ -13,18 +13,33 @@ import (
 )
 
 type Config struct {
-	RootDir     string
 	Daemon      daemon.Config
 	Installer   installer.Config
 	MetaShell   metashell.Config
 	Client      cli.Config
 	ShellClient shellclient.Config
+
+	rootDir string
 }
 
-func parseConfig(path string) (*Config, error) {
+func parseConfig() (*Config, error) {
 	var c Config
-	file, err := os.Open(path)
+
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		return nil, err
+	}
+	c.rootDir = filepath.Join(homeDir, ".metashell")
+
+	if err := metashell.EnsureDir(c.rootDir); err != nil {
+		return nil, err
+	}
+
+	file, err := os.Open(filepath.Join(c.rootDir, "config.yaml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return defaultConfig(c.rootDir)
+		}
 		return nil, err
 	}
 	defer file.Close()
@@ -34,13 +49,13 @@ func parseConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	if c.RootDir == "" {
-		cacheDir, err := os.UserCacheDir()
-		if err != nil {
-			return nil, err
-		}
-		c.RootDir = filepath.Join(cacheDir, "metashell")
-	}
-
 	return &c, err
+}
+
+func defaultConfig(rootDir string) (*Config, error) {
+	return &Config{
+		Daemon:    daemon.DefaultConfig(rootDir),
+		MetaShell: metashell.DefaultConfig(),
+		rootDir:   rootDir,
+	}, nil
 }

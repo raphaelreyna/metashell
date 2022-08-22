@@ -7,6 +7,6 @@ type Config struct {
 }
 
 func (c Config) NewShellClient(rootDir string) *ShellClient {
-	c.socketPath = filepath.Join(rootDir, "metashell.socket")
+	c.socketPath = filepath.Join(rootDir, "daemon.socket")
 	return &ShellClient{config: c}
 }

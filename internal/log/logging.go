@@ -14,7 +14,7 @@ var Log *Logger
 
 func SetLog(root, component string) error {
 	Log = &Logger{}
-	return Log.init(root, component)
+	return Log.init(filepath.Join(root, "logs"), component)
 }
 
 type Logger struct {

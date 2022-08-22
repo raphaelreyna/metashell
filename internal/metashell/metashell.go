@@ -39,8 +39,7 @@ type MetaShell struct {
 	doneChan  chan error
 	cancelCtx func()
 
-	tty      string
-	ExecPath string
+	tty string
 
 	in        io.Reader
 	out       *os.File
@@ -161,7 +160,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 	go ms.start(ctx)
 	go func() { _, _ = io.Copy(os.Stdout, ptmx) }()
 
-	if _, err := fmt.Fprintf(ptmx, ". <(%s install)\n", ms.ExecPath); err != nil {
+	if _, err := fmt.Fprintf(ptmx, ". <(%s install)\n", os.Args[0]); err != nil {
 		return err
 	}
 
@@ -281,4 +280,16 @@ func (ms *MetaShell) ensureDaemon(ctx context.Context) error {
 	}
 
 	return err
+}
+
+func EnsureDir(path string) error {
+	_, err := os.Stat(path)
+	if err == nil {
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+
+	return os.MkdirAll(path, 0700)
 }

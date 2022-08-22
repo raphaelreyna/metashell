@@ -8,9 +8,13 @@ type Config struct {
 }
 
 func (c Config) NewMetaShell(rootDir string) *MetaShell {
-	c.socketPath = filepath.Join(rootDir, "metashell.socket")
+	c.socketPath = filepath.Join(rootDir, "daemon.socket")
 	if c.ShellPath == "" {
-		c.ShellPath = "/bin/sh"
+		c.ShellPath = "/bin/bash"
 	}
 	return &MetaShell{config: c}
+}
+
+func DefaultConfig() Config {
+	return Config{ShellPath: "/bin/bash"}
 }
