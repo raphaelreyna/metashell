@@ -9,7 +9,6 @@ service ShellclientDaemon {
     rpc PostRunReport(PostRunReportRequest) returns (google.protobuf.Empty);
 }
 
-
 message PreRunReportResponse {
     string cmd_key = 1;
 }
@@ -32,8 +31,8 @@ message PostRunReportRequest {
 service MetashellDaemon {
     rpc NewExitCodeStream(google.protobuf.Empty) returns (stream CommandExitCode);
     rpc RegisterCommandEntry(CommandEntry) returns (CommandKey);
+    rpc Metacommand(MetacommandRequest) returns (MetacommandResponse);
 }
-
 
 message CommandEntry {
     string command = 1;
@@ -48,4 +47,13 @@ message CommandKey {
 message CommandExitCode {
     string key = 1;
     int32 exit_code = 2;
+}
+
+message MetacommandRequest {
+    string plugin_name = 1;
+    string meta_command = 2;
+}
+
+message MetacommandResponse {
+    string out = 1;
 }

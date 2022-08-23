@@ -1,4 +1,4 @@
-package metashell
+package installer
 
 import (
 	"context"
@@ -30,11 +30,11 @@ __postRun() {
 `
 )
 
-type installer struct {
-	shellClientPath string
+type Installer struct {
+	config Config
 }
 
-func (i *installer) run(ctx context.Context) error {
-	_, err := fmt.Fprintf(os.Stdout, bashSource, i.shellClientPath)
+func (i *Installer) Run(ctx context.Context) error {
+	_, err := fmt.Fprintf(os.Stdout, bashSource, i.config.shellClientPath)
 	return err
 }

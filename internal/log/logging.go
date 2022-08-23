@@ -1,4 +1,4 @@
-package metashell
+package log
 
 import (
 	"fmt"
@@ -10,11 +10,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var log *Logger
+var Log *Logger
 
-func initLogging(root, component string) error {
-	log = &Logger{}
-	return log.init(root, component)
+func SetLog(root, component string) error {
+	Log = &Logger{}
+	return Log.init(filepath.Join(root, "logs"), component)
 }
 
 type Logger struct {
@@ -24,6 +24,10 @@ type Logger struct {
 
 	zerolog.Logger
 	sync.Mutex
+}
+
+func (l *Logger) OutFilePath() string {
+	return l.out.Name()
 }
 
 func (l *Logger) rotate() error {
@@ -39,6 +43,9 @@ func (l *Logger) rotate() error {
 
 	newLogFileName := fmt.Sprintf("%d.log", time.Now().Unix())
 	l.out, err = os.Create(filepath.Join(l.dir, newLogFileName))
+	if err != nil {
+		err = fmt.Errorf("error rotating log file: %w", err)
+	}
 	return err
 }
 

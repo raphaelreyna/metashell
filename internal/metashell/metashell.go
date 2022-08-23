@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -19,12 +20,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	daemonproto "github.com/raphaelreyna/shelld/rpc/go/daemon"
+	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
+
+	. "github.com/raphaelreyna/shelld/internal/log"
 )
 
-type metaShell struct {
-	shellPath  string
-	socketPath string
+type MetaShell struct {
+	config Config
 
 	cmd           *exec.Cmd
 	ptmx          *os.File
@@ -38,8 +40,7 @@ type metaShell struct {
 	doneChan  chan error
 	cancelCtx func()
 
-	tty      string
-	execPath string
+	tty string
 
 	in        io.Reader
 	out       *os.File
@@ -48,10 +49,13 @@ type metaShell struct {
 
 	cmdIsRunning bool
 
+	metamode          bool
+	metamodeCmdBuffer string
+
 	sync.RWMutex
 }
 
-func (ms *metaShell) stop() {
+func (ms *MetaShell) stop() {
 	ms.cancelCtx()
 
 	ms.ecStream.CloseSend()
@@ -69,7 +73,7 @@ func (ms *metaShell) stop() {
 	ms.doneChan <- nil
 }
 
-func (ms *metaShell) run(ctx context.Context) error {
+func (ms *MetaShell) Run(ctx context.Context) error {
 	ctx, ms.cancelCtx = context.WithCancel(ctx)
 
 	err := ms.ensureDaemon(ctx)
@@ -77,7 +81,7 @@ func (ms *metaShell) run(ctx context.Context) error {
 		return err
 	}
 
-	ms.grpcConn, err = grpc.Dial("unix://"+ms.socketPath,
+	ms.grpcConn, err = grpc.Dial("unix://"+ms.config.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -85,7 +89,7 @@ func (ms *metaShell) run(ctx context.Context) error {
 	}
 	defer ms.grpcConn.Close()
 
-	ms.cmd = exec.CommandContext(ctx, ms.shellPath)
+	ms.cmd = exec.CommandContext(ctx, ms.config.ShellPath)
 	ptmx, err := pty.Start(ms.cmd)
 	if err != nil {
 		return err
@@ -105,10 +109,10 @@ func (ms *metaShell) run(ctx context.Context) error {
 	go func() {
 		var err error
 		for {
-			log.Info().Msg("received exit code")
+			Log.Info().Msg("received exit code")
 			_, err = ms.ecStream.Recv()
 			if err != nil {
-				log.Error().
+				Log.Error().
 					Err(err).
 					Msg("error reading from exit code stream")
 				return
@@ -160,14 +164,14 @@ func (ms *metaShell) run(ctx context.Context) error {
 	go ms.start(ctx)
 	go func() { _, _ = io.Copy(os.Stdout, ptmx) }()
 
-	if _, err := fmt.Fprintf(ptmx, ". <(%s install)\n", ms.execPath); err != nil {
+	if _, err := fmt.Fprintf(ptmx, ". <(%s install)\n", os.Args[0]); err != nil {
 		return err
 	}
 
 	return <-ms.doneChan
 }
 
-func (ms *metaShell) start(ctx context.Context) {
+func (ms *MetaShell) start(ctx context.Context) {
 	ms.scanner = bufio.NewScanner(ms.in)
 
 	ms.scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -189,29 +193,55 @@ func (ms *metaShell) start(ctx context.Context) {
 		if !cmdIsRunning {
 			switch input[0] {
 			case 27: // ESC
-				log.Info().Msg("ESC")
-			case 13: // \n
-				log.Info().Msg("registering")
-				_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
-					Command:   ms.cmdBuffer,
-					Tty:       ms.tty,
-					Timestamp: time.Now().Unix(),
-				})
-				if err != nil {
-					log.Error().
-						Err(err).
-						Msg("error registering command with daemon")
+				ms.metamode = !ms.metamode
+				if ms.metamode {
+					ms.metamodeCmdBuffer = ""
+				} else {
 				}
+			case 13: // \n
+				if ms.metamode {
+					parts := strings.Split(ms.metamodeCmdBuffer, "::")
+					resp, err := ms.client.Metacommand(ctx, &daemonproto.MetacommandRequest{
+						PluginName:  parts[0],
+						MetaCommand: parts[1],
+					})
+					if err != nil {
+						Log.Error().Err(err).
+							Str("plugin", parts[0]).
+							Str("metacommand", parts[1]).
+							Msg("metacommand error")
+					}
+					os.Stdout.Write([]byte("\r"))
+					os.Stdout.Write([]byte(resp.Out))
+					ms.cmdBuffer = ""
+				} else {
+					Log.Info().Msg("registering")
+					_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
+						Command:   ms.cmdBuffer,
+						Tty:       ms.tty,
+						Timestamp: time.Now().Unix(),
+					})
+					if err != nil {
+						Log.Error().
+							Err(err).
+							Msg("error registering command with daemon")
+					}
 
-				ms.cmdBuffer = ""
-				ms.Lock()
-				ms.cmdIsRunning = true
-				ms.Unlock()
+					ms.cmdBuffer = ""
+					ms.Lock()
+					ms.cmdIsRunning = true
+					ms.Unlock()
 
-				ms.out.Write([]byte{13})
+					ms.out.Write([]byte{13})
+				}
 			default:
-				ms.cmdBuffer += string(input)
-				ms.out.Write(input)
+				if ms.metamode {
+					ms.metamodeCmdBuffer += string(input)
+					os.Stdout.Write(input)
+				} else {
+					ms.cmdBuffer += string(input)
+					ms.out.Write(input)
+				}
 			}
 		} else {
 			ms.out.Write(input)
@@ -263,8 +293,8 @@ func restoreTTYSettings(fd int, old *unix.Termios) error {
 	return unix.IoctlSetTermios(fd, ioctlWriteTermios, old)
 }
 
-func (ms *metaShell) ensureDaemon(ctx context.Context) error {
-	_, err := os.Stat(ms.socketPath)
+func (ms *MetaShell) ensureDaemon(ctx context.Context) error {
+	_, err := os.Stat(ms.config.socketPath)
 	if err == nil {
 		return nil
 	}
@@ -280,4 +310,16 @@ func (ms *metaShell) ensureDaemon(ctx context.Context) error {
 	}
 
 	return err
+}
+
+func EnsureDir(path string) error {
+	_, err := os.Stat(path)
+	if err == nil {
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+
+	return os.MkdirAll(path, 0700)
 }

@@ -1,4 +1,4 @@
-package metashell
+package shellclient
 
 import (
 	"context"
@@ -7,15 +7,17 @@ import (
 	"os"
 	"time"
 
-	daemonproto "github.com/raphaelreyna/shelld/rpc/go/daemon"
+	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	. "github.com/raphaelreyna/shelld/internal/log"
 )
 
 const SubCommandShellClient = "shellclient"
 
-type shellClient struct {
-	SocketPath string
+type ShellClient struct {
+	config Config
 
 	tty      string
 	cmd      string
@@ -23,7 +25,7 @@ type shellClient struct {
 	exitCode int
 }
 
-func (sc *shellClient) parseFlags() {
+func (sc *ShellClient) parseFlags() {
 	fs := flag.NewFlagSet("shellclient", flag.PanicOnError)
 	fs.StringVar(&sc.tty, "tty", "", "internal")
 	fs.StringVar(&sc.cmd, "cmd", "", "internal")
@@ -33,10 +35,10 @@ func (sc *shellClient) parseFlags() {
 	fs.Parse(os.Args[2:])
 }
 
-func (sc *shellClient) Run(ctx context.Context) error {
+func (sc *ShellClient) Run(ctx context.Context) error {
 	sc.parseFlags()
 
-	logEvent := log.Info().
+	logEvent := Log.Info().
 		Strs("args", os.Args)
 
 	var (
@@ -58,12 +60,12 @@ func (sc *shellClient) Run(ctx context.Context) error {
 	return fmt.Errorf("invalid flag combination")
 }
 
-func (r *shellClient) recordExitCode(ctx context.Context) error {
+func (r *ShellClient) recordExitCode(ctx context.Context) error {
 	if r.exitCode < 0 {
 		panic("exit code not set")
 	}
 
-	conn, err := grpc.Dial("unix://"+r.SocketPath,
+	conn, err := grpc.Dial("unix://"+r.config.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -79,8 +81,8 @@ func (r *shellClient) recordExitCode(ctx context.Context) error {
 	return err
 }
 
-func (r *shellClient) requestID(ctx context.Context) error {
-	conn, err := grpc.Dial("unix://"+r.SocketPath,
+func (r *ShellClient) requestID(ctx context.Context) error {
+	conn, err := grpc.Dial("unix://"+r.config.socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

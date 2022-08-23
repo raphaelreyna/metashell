@@ -1,4 +1,4 @@
-package metashell
+package cli
 
 import (
 	"context"
@@ -9,26 +9,22 @@ import (
 	godaemon "github.com/sevlyar/go-daemon"
 )
 
-type client struct {
-	socketPath           string
-	postRunReportHandler PostRunReportHandlerFunc
-	pidFileName          string
-	logFileName          string
-	workDir              string
+type Client struct {
+	config Config
 
 	process *os.Process
 }
 
-func (c *client) run(ctx context.Context) error {
+func (c *Client) Run(ctx context.Context) error {
 	var (
 		err   error
 		arg   string
 		cntxt = godaemon.Context{
-			PidFileName: c.pidFileName,
+			PidFileName: c.config.pidFileName,
 			PidFilePerm: 0644,
-			LogFileName: c.logFileName,
+			LogFileName: c.config.logFileName,
 			LogFilePerm: 0640,
-			WorkDir:     c.workDir,
+			WorkDir:     c.config.workDir,
 			Umask:       027,
 		}
 	)
@@ -51,6 +47,6 @@ func (c *client) run(ctx context.Context) error {
 	return nil
 }
 
-func (c *client) quitDaemon(ctx context.Context) error {
+func (c *Client) quitDaemon(ctx context.Context) error {
 	return c.process.Signal(syscall.SIGTERM)
 }

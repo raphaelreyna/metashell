@@ -1,9 +1,8 @@
-package metashell
+package daemon
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -11,10 +10,13 @@ import (
 	"syscall"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	daemonproto "github.com/raphaelreyna/shelld/rpc/go/daemon"
+	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
+	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
 	godaemon "github.com/sevlyar/go-daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	. "github.com/raphaelreyna/shelld/internal/log"
 )
 
 const SubCommandDaemon = "daemon"
@@ -33,12 +35,8 @@ type exitCode struct {
 	time int64
 }
 
-type daemon struct {
-	socketPath           string
-	postRunReportHandler PostRunReportHandlerFunc
-	pidFileName          string
-	logFileName          string
-	workDir              string
+type Daemon struct {
+	config Config
 
 	listener   net.Listener
 	grpcServer *grpc.Server
@@ -46,40 +44,46 @@ type daemon struct {
 	cks                 *cmdKeyService
 	exitCodeStreamChans map[string]chan exitCode
 
+	plugins *plugins
+
 	daemonproto.UnimplementedMetashellDaemonServer
 	daemonproto.UnimplementedShellclientDaemonServer
 }
 
-func (d *daemon) termHandler(sig os.Signal) error {
-	log.Info().
+func (d *Daemon) termHandler(sig os.Signal) error {
+	Log.Info().
 		Str("signal", sig.String()).
 		Msg("handling termination on signal")
 	d.grpcServer.GracefulStop()
-	log.Info().Msg("stopped gRPC server")
+	Log.Info().Msg("stopped gRPC server")
 	if err := d.listener.Close(); err != nil {
 		if !strings.Contains(err.Error(), "use of closed network connection") {
-			log.Error().
+			Log.Error().
 				Err(err).
 				Msg("error closing unix socket listener")
 		} else {
-			log.Info().Msg("closed unix socket listener")
+			Log.Info().Msg("closed unix socket listener")
 		}
 	} else {
-		log.Info().Msg("closed unix socket listener")
+		Log.Info().Msg("closed unix socket listener")
+	}
+	if err := d.plugins.Close(); err != nil {
+		Log.Error().Err(err).
+			Msg("error closing plugins")
 	}
 	return nil
 }
 
-func (d *daemon) run(ctx context.Context) error {
+func (d *Daemon) Run(ctx context.Context) error {
 	d.cks = &cmdKeyService{}
 	d.exitCodeStreamChans = make(map[string]chan exitCode)
 
 	cntxt := &godaemon.Context{
-		PidFileName: d.pidFileName,
+		PidFileName: d.config.pidFileName,
 		PidFilePerm: 0644,
-		LogFileName: d.logFileName,
+		LogFileName: d.config.logFileName,
 		LogFilePerm: 0640,
-		WorkDir:     d.workDir,
+		WorkDir:     d.config.workDir,
 		Umask:       027,
 	}
 
@@ -100,19 +104,24 @@ func (d *daemon) run(ctx context.Context) error {
 		d.termHandler(sig)
 	}()
 
-	if _, err := os.Stat(d.socketPath); err == nil {
-		if err := os.Remove(d.socketPath); err != nil {
+	if _, err := os.Stat(d.config.socketPath); err == nil {
+		if err := os.Remove(d.config.socketPath); err != nil {
 			return err
 		}
 	}
 
-	if _, err := os.Stat(d.socketPath); err == nil {
-		if err := os.Remove(d.socketPath); err != nil {
+	if _, err := os.Stat(d.config.socketPath); err == nil {
+		if err := os.Remove(d.config.socketPath); err != nil {
 			return err
 		}
 	}
 
-	d.listener, err = net.Listen("unix", d.socketPath)
+	d.plugins = &plugins{}
+	if err := d.plugins.init(ctx, d.config.PluginsDir); err != nil {
+		return err
+	}
+
+	d.listener, err = net.Listen("unix", d.config.socketPath)
 	if err != nil {
 		return err
 	}
@@ -123,7 +132,7 @@ func (d *daemon) run(ctx context.Context) error {
 	return d.grpcServer.Serve(d.listener)
 }
 
-func (d *daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellDaemon_NewExitCodeStreamServer) error {
+func (d *Daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellDaemon_NewExitCodeStreamServer) error {
 	ctx := server.Context()
 
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -137,7 +146,7 @@ func (d *daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellD
 		return fmt.Errorf("no tty given in metadata")
 	}
 
-	log.Info().
+	Log.Info().
 		Str("tty", tty).
 		Msg("registered new tty")
 	d.exitCodeStreamChans[tty] = ceChan
@@ -147,25 +156,25 @@ func (d *daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellD
 		case <-ctx.Done():
 			return nil
 		case ce := <-ceChan:
-			log.Info().
+			Log.Info().
 				Msg("got exit code via chan, sending via grpc")
 			err := server.Send(&daemonproto.CommandExitCode{
 				Key:      ce.key,
 				ExitCode: int32(ce.code),
 			})
 			if err != nil {
-				log.Error().Err(err).
+				Log.Error().Err(err).
 					Msg("error sending command exit code")
 				return err
 			}
-			log.Info().
+			Log.Info().
 				Msg("sent exit code over grpc")
 		}
 	}
 }
 
-func (d *daemon) RegisterCommandEntry(ctx context.Context, req *daemonproto.CommandEntry) (*daemonproto.CommandKey, error) {
-	log.Info().Msg("RegisterCommandEntry")
+func (d *Daemon) RegisterCommandEntry(ctx context.Context, req *daemonproto.CommandEntry) (*daemonproto.CommandKey, error) {
+	Log.Info().Msg("RegisterCommandEntry")
 
 	key := d.cks.registerVector(&vector{
 		command:   req.Command,
@@ -176,8 +185,8 @@ func (d *daemon) RegisterCommandEntry(ctx context.Context, req *daemonproto.Comm
 	return &daemonproto.CommandKey{Key: key}, nil
 }
 
-func (d *daemon) PreRunQuery(ctx context.Context, req *daemonproto.PreRunQueryRequest) (*daemonproto.PreRunQueryResponse, error) {
-	log.Info().Msg("PreRunQuery")
+func (d *Daemon) PreRunQuery(ctx context.Context, req *daemonproto.PreRunQueryRequest) (*daemonproto.PreRunQueryResponse, error) {
+	Log.Info().Msg("PreRunQuery")
 
 	k := d.cks.getKey(&vector{
 		command:   req.Command,
@@ -192,17 +201,17 @@ func (d *daemon) PreRunQuery(ctx context.Context, req *daemonproto.PreRunQueryRe
 	return &daemonproto.PreRunQueryResponse{Uuid: k}, nil
 }
 
-func (d *daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunReportRequest) (*empty.Empty, error) {
-	log.Info().Msg("PostRunReport")
+func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunReportRequest) (*empty.Empty, error) {
+	Log.Info().Msg("PostRunReport")
 
 	if req.Uuid == "INIT" {
-		log.Debug().Msg("got INIT")
+		Log.Debug().Msg("got INIT")
 		return &empty.Empty{}, nil
 	}
 
 	v := d.cks.exchangeKey(req.Uuid)
 	if v == nil {
-		log.Warn().
+		Log.Warn().
 			Str("key", req.Uuid).
 			Msg("could not find vector for key")
 		return &empty.Empty{}, nil
@@ -211,7 +220,7 @@ func (d *daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 	go func() {
 		ecChan, exists := d.exitCodeStreamChans[v.tty]
 		if !exists {
-			log.Warn().
+			Log.Warn().
 				Str("tty", v.tty).
 				Msg("got post run report for a non-connected tty")
 			return
@@ -224,22 +233,20 @@ func (d *daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 	}()
 
 	go func() {
-		ctx = context.WithValue(ctx, stdoutKey{}, log)
-		log.Debug().Msg("running hook")
-		d.postRunReportHandler(ctx, &PostRunReport{
-			TTY:       v.tty,
+		Log.Debug().Msg("running hook")
+		d.plugins.commandReport(context.TODO(), &proto.ReportCommandRequest{
 			Command:   v.command,
-			Timestamp: v.timestamp,
+			Tty:       v.tty,
+			Timestamp: uint64(v.timestamp),
+			ExitCode:  req.ExitCode,
 		})
-		log.Debug().Msg("ran hook")
+		Log.Debug().Msg("ran hook")
 	}()
 
 	return &empty.Empty{}, nil
 }
 
-type stdoutKey struct{}
-
-func GetStdout(ctx context.Context) io.Writer {
-	w, _ := ctx.Value(stdoutKey{}).(io.Writer)
-	return w
+func (d *Daemon) Metacommand(ctx context.Context, req *daemonproto.MetacommandRequest) (*daemonproto.MetacommandResponse, error) {
+	out, err := d.plugins.metacommand(ctx, req.PluginName, req.MetaCommand)
+	return &daemonproto.MetacommandResponse{Out: out}, err
 }

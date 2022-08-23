@@ -1,4 +1,4 @@
-package metashell
+package daemon
 
 import (
 	"crypto/md5"
