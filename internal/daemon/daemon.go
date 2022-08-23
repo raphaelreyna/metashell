@@ -234,7 +234,7 @@ func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 
 	go func() {
 		Log.Debug().Msg("running hook")
-		d.plugins.commandReport(context.TODO(), &proto.CommandReport{
+		d.plugins.commandReport(context.TODO(), &proto.ReportCommandRequest{
 			Command:   v.command,
 			Tty:       v.tty,
 			Timestamp: uint64(v.timestamp),
@@ -244,4 +244,9 @@ func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 	}()
 
 	return &empty.Empty{}, nil
+}
+
+func (d *Daemon) Metacommand(ctx context.Context, req *daemonproto.MetacommandRequest) (*daemonproto.MetacommandResponse, error) {
+	out, err := d.plugins.metacommand(ctx, req.PluginName, req.MetaCommand)
+	return &daemonproto.MetacommandResponse{Out: out}, err
 }

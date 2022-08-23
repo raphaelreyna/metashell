@@ -4,6 +4,8 @@ import "path/filepath"
 
 type Config struct {
 	ShellPath  string
+	PluginsDir string
+
 	socketPath string
 }
 
@@ -12,9 +14,15 @@ func (c Config) NewMetaShell(rootDir string) *MetaShell {
 	if c.ShellPath == "" {
 		c.ShellPath = "/bin/bash"
 	}
+	if c.PluginsDir == "" {
+		c.PluginsDir = filepath.Join(rootDir, "plugins", "metashell")
+	}
 	return &MetaShell{config: c}
 }
 
-func DefaultConfig() Config {
-	return Config{ShellPath: "/bin/bash"}
+func DefaultConfig(rootPath string) Config {
+	return Config{
+		ShellPath:  "/bin/bash",
+		PluginsDir: filepath.Join(rootPath, "plugins", "metashell"),
+	}
 }

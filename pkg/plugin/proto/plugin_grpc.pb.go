@@ -14,86 +14,122 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// CommandReportHandlerClient is the client API for CommandReportHandler service.
+// DaemonPluginClient is the client API for DaemonPlugin service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type CommandReportHandlerClient interface {
-	ReportCommand(ctx context.Context, in *CommandReport, opts ...grpc.CallOption) (*Empty, error)
+type DaemonPluginClient interface {
+	ReportCommand(ctx context.Context, in *ReportCommandRequest, opts ...grpc.CallOption) (*Empty, error)
+	Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error)
 }
 
-type commandReportHandlerClient struct {
+type daemonPluginClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewCommandReportHandlerClient(cc grpc.ClientConnInterface) CommandReportHandlerClient {
-	return &commandReportHandlerClient{cc}
+func NewDaemonPluginClient(cc grpc.ClientConnInterface) DaemonPluginClient {
+	return &daemonPluginClient{cc}
 }
 
-func (c *commandReportHandlerClient) ReportCommand(ctx context.Context, in *CommandReport, opts ...grpc.CallOption) (*Empty, error) {
+func (c *daemonPluginClient) ReportCommand(ctx context.Context, in *ReportCommandRequest, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/proto.CommandReportHandler/ReportCommand", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/proto.DaemonPlugin/ReportCommand", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// CommandReportHandlerServer is the server API for CommandReportHandler service.
-// All implementations must embed UnimplementedCommandReportHandlerServer
+func (c *daemonPluginClient) Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error) {
+	out := new(MetacommandResponse)
+	err := c.cc.Invoke(ctx, "/proto.DaemonPlugin/Metacommand", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DaemonPluginServer is the server API for DaemonPlugin service.
+// All implementations must embed UnimplementedDaemonPluginServer
 // for forward compatibility
-type CommandReportHandlerServer interface {
-	ReportCommand(context.Context, *CommandReport) (*Empty, error)
-	mustEmbedUnimplementedCommandReportHandlerServer()
+type DaemonPluginServer interface {
+	ReportCommand(context.Context, *ReportCommandRequest) (*Empty, error)
+	Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error)
+	mustEmbedUnimplementedDaemonPluginServer()
 }
 
-// UnimplementedCommandReportHandlerServer must be embedded to have forward compatible implementations.
-type UnimplementedCommandReportHandlerServer struct {
+// UnimplementedDaemonPluginServer must be embedded to have forward compatible implementations.
+type UnimplementedDaemonPluginServer struct {
 }
 
-func (UnimplementedCommandReportHandlerServer) ReportCommand(context.Context, *CommandReport) (*Empty, error) {
+func (UnimplementedDaemonPluginServer) ReportCommand(context.Context, *ReportCommandRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReportCommand not implemented")
 }
-func (UnimplementedCommandReportHandlerServer) mustEmbedUnimplementedCommandReportHandlerServer() {}
+func (UnimplementedDaemonPluginServer) Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Metacommand not implemented")
+}
+func (UnimplementedDaemonPluginServer) mustEmbedUnimplementedDaemonPluginServer() {}
 
-// UnsafeCommandReportHandlerServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to CommandReportHandlerServer will
+// UnsafeDaemonPluginServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to DaemonPluginServer will
 // result in compilation errors.
-type UnsafeCommandReportHandlerServer interface {
-	mustEmbedUnimplementedCommandReportHandlerServer()
+type UnsafeDaemonPluginServer interface {
+	mustEmbedUnimplementedDaemonPluginServer()
 }
 
-func RegisterCommandReportHandlerServer(s grpc.ServiceRegistrar, srv CommandReportHandlerServer) {
-	s.RegisterService(&CommandReportHandler_ServiceDesc, srv)
+func RegisterDaemonPluginServer(s grpc.ServiceRegistrar, srv DaemonPluginServer) {
+	s.RegisterService(&DaemonPlugin_ServiceDesc, srv)
 }
 
-func _CommandReportHandler_ReportCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CommandReport)
+func _DaemonPlugin_ReportCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportCommandRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CommandReportHandlerServer).ReportCommand(ctx, in)
+		return srv.(DaemonPluginServer).ReportCommand(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.CommandReportHandler/ReportCommand",
+		FullMethod: "/proto.DaemonPlugin/ReportCommand",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CommandReportHandlerServer).ReportCommand(ctx, req.(*CommandReport))
+		return srv.(DaemonPluginServer).ReportCommand(ctx, req.(*ReportCommandRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// CommandReportHandler_ServiceDesc is the grpc.ServiceDesc for CommandReportHandler service.
+func _DaemonPlugin_Metacommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MetacommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonPluginServer).Metacommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.DaemonPlugin/Metacommand",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonPluginServer).Metacommand(ctx, req.(*MetacommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// DaemonPlugin_ServiceDesc is the grpc.ServiceDesc for DaemonPlugin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var CommandReportHandler_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.CommandReportHandler",
-	HandlerType: (*CommandReportHandlerServer)(nil),
+var DaemonPlugin_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.DaemonPlugin",
+	HandlerType: (*DaemonPluginServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "ReportCommand",
-			Handler:    _CommandReportHandler_ReportCommand_Handler,
+			Handler:    _DaemonPlugin_ReportCommand_Handler,
+		},
+		{
+			MethodName: "Metacommand",
+			Handler:    _DaemonPlugin_Metacommand_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

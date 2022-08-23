@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -47,6 +48,9 @@ type MetaShell struct {
 	scanner   *bufio.Scanner
 
 	cmdIsRunning bool
+
+	metamode          bool
+	metamodeCmdBuffer string
 
 	sync.RWMutex
 }
@@ -189,29 +193,55 @@ func (ms *MetaShell) start(ctx context.Context) {
 		if !cmdIsRunning {
 			switch input[0] {
 			case 27: // ESC
-				Log.Info().Msg("ESC")
-			case 13: // \n
-				Log.Info().Msg("registering")
-				_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
-					Command:   ms.cmdBuffer,
-					Tty:       ms.tty,
-					Timestamp: time.Now().Unix(),
-				})
-				if err != nil {
-					Log.Error().
-						Err(err).
-						Msg("error registering command with daemon")
+				ms.metamode = !ms.metamode
+				if ms.metamode {
+					ms.metamodeCmdBuffer = ""
+				} else {
 				}
+			case 13: // \n
+				if ms.metamode {
+					parts := strings.Split(ms.metamodeCmdBuffer, "::")
+					resp, err := ms.client.Metacommand(ctx, &daemonproto.MetacommandRequest{
+						PluginName:  parts[0],
+						MetaCommand: parts[1],
+					})
+					if err != nil {
+						Log.Error().Err(err).
+							Str("plugin", parts[0]).
+							Str("metacommand", parts[1]).
+							Msg("metacommand error")
+					}
+					os.Stdout.Write([]byte("\r"))
+					os.Stdout.Write([]byte(resp.Out))
+					ms.cmdBuffer = ""
+				} else {
+					Log.Info().Msg("registering")
+					_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
+						Command:   ms.cmdBuffer,
+						Tty:       ms.tty,
+						Timestamp: time.Now().Unix(),
+					})
+					if err != nil {
+						Log.Error().
+							Err(err).
+							Msg("error registering command with daemon")
+					}
 
-				ms.cmdBuffer = ""
-				ms.Lock()
-				ms.cmdIsRunning = true
-				ms.Unlock()
+					ms.cmdBuffer = ""
+					ms.Lock()
+					ms.cmdIsRunning = true
+					ms.Unlock()
 
-				ms.out.Write([]byte{13})
+					ms.out.Write([]byte{13})
+				}
 			default:
-				ms.cmdBuffer += string(input)
-				ms.out.Write(input)
+				if ms.metamode {
+					ms.metamodeCmdBuffer += string(input)
+					os.Stdout.Write(input)
+				} else {
+					ms.cmdBuffer += string(input)
+					ms.out.Write(input)
+				}
 			}
 		} else {
 			ms.out.Write(input)

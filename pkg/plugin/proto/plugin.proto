@@ -1,15 +1,24 @@
 syntax = "proto3";
 package proto;
 
-message CommandReport {
+message Empty {}
+
+message ReportCommandRequest {
     string command = 1;
     string tty = 2;
     uint64 timestamp = 3;
     int32 exit_code = 4;
 }
 
-message Empty {}
+message MetacommandRequest {
+    string meta_command = 1;
+}
 
-service CommandReportHandler {
-    rpc ReportCommand(CommandReport) returns (Empty);
+message MetacommandResponse {
+    string out = 1;
+}
+
+service DaemonPlugin {
+    rpc ReportCommand(ReportCommandRequest) returns (Empty);
+    rpc Metacommand(MetacommandRequest) returns (MetacommandResponse);
 }

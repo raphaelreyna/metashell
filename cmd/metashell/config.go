@@ -55,7 +55,7 @@ func parseConfig() (*Config, error) {
 func defaultConfig(rootDir string) (*Config, error) {
 	return &Config{
 		Daemon:    daemon.DefaultConfig(rootDir),
-		MetaShell: metashell.DefaultConfig(),
+		MetaShell: metashell.DefaultConfig(rootDir),
 		rootDir:   rootDir,
 	}, nil
 }

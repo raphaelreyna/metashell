@@ -1,7 +1,7 @@
 #!/bin/bash
-SRC_DIR=rpc/proto
-OUT_DIR=rpc/go
-FILES=$(find rpc/proto -iname "*.proto")
+SRC_DIR=internal/rpc/proto
+OUT_DIR=internal/rpc/go
+FILES=$(find internal/rpc/proto -iname "*.proto")
 
 Go() {
     rm -rf $OUT_DIR 2>&1 > /dev/null

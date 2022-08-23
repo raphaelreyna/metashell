@@ -143,6 +143,7 @@ var ShellclientDaemon_ServiceDesc = grpc.ServiceDesc{
 type MetashellDaemonClient interface {
 	NewExitCodeStream(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (MetashellDaemon_NewExitCodeStreamClient, error)
 	RegisterCommandEntry(ctx context.Context, in *CommandEntry, opts ...grpc.CallOption) (*CommandKey, error)
+	Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error)
 }
 
 type metashellDaemonClient struct {
@@ -194,12 +195,22 @@ func (c *metashellDaemonClient) RegisterCommandEntry(ctx context.Context, in *Co
 	return out, nil
 }
 
+func (c *metashellDaemonClient) Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error) {
+	out := new(MetacommandResponse)
+	err := c.cc.Invoke(ctx, "/shelld.daemon.MetashellDaemon/Metacommand", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MetashellDaemonServer is the server API for MetashellDaemon service.
 // All implementations must embed UnimplementedMetashellDaemonServer
 // for forward compatibility
 type MetashellDaemonServer interface {
 	NewExitCodeStream(*empty.Empty, MetashellDaemon_NewExitCodeStreamServer) error
 	RegisterCommandEntry(context.Context, *CommandEntry) (*CommandKey, error)
+	Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error)
 	mustEmbedUnimplementedMetashellDaemonServer()
 }
 
@@ -212,6 +223,9 @@ func (UnimplementedMetashellDaemonServer) NewExitCodeStream(*empty.Empty, Metash
 }
 func (UnimplementedMetashellDaemonServer) RegisterCommandEntry(context.Context, *CommandEntry) (*CommandKey, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterCommandEntry not implemented")
+}
+func (UnimplementedMetashellDaemonServer) Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Metacommand not implemented")
 }
 func (UnimplementedMetashellDaemonServer) mustEmbedUnimplementedMetashellDaemonServer() {}
 
@@ -265,6 +279,24 @@ func _MetashellDaemon_RegisterCommandEntry_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MetashellDaemon_Metacommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MetacommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetashellDaemonServer).Metacommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/shelld.daemon.MetashellDaemon/Metacommand",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetashellDaemonServer).Metacommand(ctx, req.(*MetacommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MetashellDaemon_ServiceDesc is the grpc.ServiceDesc for MetashellDaemon service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -275,6 +307,10 @@ var MetashellDaemon_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RegisterCommandEntry",
 			Handler:    _MetashellDaemon_RegisterCommandEntry_Handler,
+		},
+		{
+			MethodName: "Metacommand",
+			Handler:    _MetashellDaemon_Metacommand_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

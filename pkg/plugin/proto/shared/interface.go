@@ -18,23 +18,24 @@ var Handshake = plugin.HandshakeConfig{
 
 // PluginMap is the map of plugins we can dispense.
 var PluginMap = map[string]plugin.Plugin{
-	"commandReportHandler": &CommandReportHandlerPlugin{},
+	"daemonPlugin": &DaemonPluginImplementation{},
 }
 
-type CommandReportHandler interface {
-	ReportCommand(context.Context, *proto.CommandReport) error
+type DaemonPlugin interface {
+	ReportCommand(context.Context, *proto.ReportCommandRequest) error
+	Metacommand(context.Context, string) (string, error)
 }
 
-type CommandReportHandlerPlugin struct {
+type DaemonPluginImplementation struct {
 	plugin.Plugin
-	Impl CommandReportHandler
+	Impl DaemonPlugin
 }
 
-func (p *CommandReportHandlerPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	proto.RegisterCommandReportHandlerServer(s, &CommandReportHandlerServer{Impl: p.Impl})
+func (p *DaemonPluginImplementation) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
+	proto.RegisterDaemonPluginServer(s, &DaemonPluginServer{Impl: p.Impl})
 	return nil
 }
 
-func (p *CommandReportHandlerPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return &CommandReportHandlerClient{client: proto.NewCommandReportHandlerClient(c)}, nil
+func (p *DaemonPluginImplementation) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+	return &DaemonPluginClient{client: proto.NewDaemonPluginClient(c)}, nil
 }
