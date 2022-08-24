@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/hashicorp/go-plugin"
 	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
 	"github.com/raphaelreyna/shelld/pkg/plugin/proto/shared"
@@ -20,19 +22,42 @@ func (h *handler) ReportCommand(ctx context.Context, rep *proto.ReportCommandReq
 	return nil
 }
 
-func (h *handler) Metacommand(ctx context.Context, cmd string) (string, error) {
+func (h *handler) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (string, error) {
 	if len(h.history) == 0 {
 		return "", nil
 	}
 
-	switch cmd {
+	switch req.MetaCommand {
 	case "history":
-		return strings.Join(h.history, ", "), nil
+		var width, height int
+		parts := strings.Split(req.FormatArgs[0], "=")
+		fmt.Sscanf(parts[1], "%dx%d", &width, &height)
+		out := strings.Join(h.history, ", ")
+		out = lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, out)
+		return out, nil
 	case "last":
 		return h.history[len(h.history)-1], nil
 	}
 
-	return "", nil
+	return "", errors.New("unknown command")
+}
+
+func (h *handler) Info(ctx context.Context) (*proto.PluginInfo, error) {
+	return &proto.PluginInfo{
+		Name:                  "p1",
+		Version:               "v0.0.1",
+		AcceptsCommandReports: true,
+		Metacommands: []*proto.MetacommandInfo{
+			{
+				Name:   "history",
+				Format: proto.MetacommandResponseFormat_SCREEN,
+			},
+			{
+				Name:   "last",
+				Format: proto.MetacommandResponseFormat_SHELL,
+			},
+		},
+	}, nil
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

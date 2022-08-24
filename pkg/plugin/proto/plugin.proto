@@ -12,13 +12,36 @@ message ReportCommandRequest {
 
 message MetacommandRequest {
     string meta_command = 1;
+    repeated string args = 2;
+    repeated string format_args = 4;
 }
 
 message MetacommandResponse {
     string out = 1;
+    string error = 2;
+}
+
+enum MetacommandResponseFormat {
+    UNSPECIFIED = 0;
+    TEXT = 1;
+    SCREEN = 2;
+    SHELL = 3;
+}
+
+message PluginInfo {
+    string name = 1;
+    string version  = 2;
+    bool accepts_command_reports = 3;
+    repeated MetacommandInfo metacommands = 4;
+}
+
+message MetacommandInfo {
+    string name = 1;
+    MetacommandResponseFormat format = 3;
 }
 
 service DaemonPlugin {
     rpc ReportCommand(ReportCommandRequest) returns (Empty);
     rpc Metacommand(MetacommandRequest) returns (MetacommandResponse);
+    rpc Info(Empty) returns (PluginInfo);
 }

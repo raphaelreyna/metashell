@@ -8,11 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/creack/pty"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/sys/unix"
@@ -48,9 +48,6 @@ type MetaShell struct {
 	scanner   *bufio.Scanner
 
 	cmdIsRunning bool
-
-	metamode          bool
-	metamodeCmdBuffer string
 
 	sync.RWMutex
 }
@@ -193,55 +190,40 @@ func (ms *MetaShell) start(ctx context.Context) {
 		if !cmdIsRunning {
 			switch input[0] {
 			case 27: // ESC
-				ms.metamode = !ms.metamode
-				if ms.metamode {
-					ms.metamodeCmdBuffer = ""
-				} else {
+				mh, err := newMetamodeHandler(ms.client)
+				if err != nil {
+					panic(err)
+				}
+				p := tea.NewProgram(mh, tea.WithAltScreen())
+				if err := p.Start(); err != nil {
+					panic(err)
+				}
+				out := mh.metaCommandOut
+				if out != "" {
+					ms.out.Write([]byte(out))
 				}
 			case 13: // \n
-				if ms.metamode {
-					parts := strings.Split(ms.metamodeCmdBuffer, "::")
-					resp, err := ms.client.Metacommand(ctx, &daemonproto.MetacommandRequest{
-						PluginName:  parts[0],
-						MetaCommand: parts[1],
-					})
-					if err != nil {
-						Log.Error().Err(err).
-							Str("plugin", parts[0]).
-							Str("metacommand", parts[1]).
-							Msg("metacommand error")
-					}
-					os.Stdout.Write([]byte("\r"))
-					os.Stdout.Write([]byte(resp.Out))
-					ms.cmdBuffer = ""
-				} else {
-					Log.Info().Msg("registering")
-					_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
-						Command:   ms.cmdBuffer,
-						Tty:       ms.tty,
-						Timestamp: time.Now().Unix(),
-					})
-					if err != nil {
-						Log.Error().
-							Err(err).
-							Msg("error registering command with daemon")
-					}
-
-					ms.cmdBuffer = ""
-					ms.Lock()
-					ms.cmdIsRunning = true
-					ms.Unlock()
-
-					ms.out.Write([]byte{13})
+				Log.Info().Msg("registering")
+				_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
+					Command:   ms.cmdBuffer,
+					Tty:       ms.tty,
+					Timestamp: time.Now().Unix(),
+				})
+				if err != nil {
+					Log.Error().
+						Err(err).
+						Msg("error registering command with daemon")
 				}
+
+				ms.cmdBuffer = ""
+				ms.Lock()
+				ms.cmdIsRunning = true
+				ms.Unlock()
+
+				ms.out.Write([]byte{13})
 			default:
-				if ms.metamode {
-					ms.metamodeCmdBuffer += string(input)
-					os.Stdout.Write(input)
-				} else {
-					ms.cmdBuffer += string(input)
-					ms.out.Write(input)
-				}
+				ms.cmdBuffer += string(input)
+				ms.out.Write(input)
 			}
 		} else {
 			ms.out.Write(input)

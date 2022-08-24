@@ -144,6 +144,7 @@ type MetashellDaemonClient interface {
 	NewExitCodeStream(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (MetashellDaemon_NewExitCodeStreamClient, error)
 	RegisterCommandEntry(ctx context.Context, in *CommandEntry, opts ...grpc.CallOption) (*CommandKey, error)
 	Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error)
+	GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error)
 }
 
 type metashellDaemonClient struct {
@@ -204,6 +205,15 @@ func (c *metashellDaemonClient) Metacommand(ctx context.Context, in *Metacommand
 	return out, nil
 }
 
+func (c *metashellDaemonClient) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error) {
+	out := new(GetPluginInfoResponse)
+	err := c.cc.Invoke(ctx, "/shelld.daemon.MetashellDaemon/GetPluginInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MetashellDaemonServer is the server API for MetashellDaemon service.
 // All implementations must embed UnimplementedMetashellDaemonServer
 // for forward compatibility
@@ -211,6 +221,7 @@ type MetashellDaemonServer interface {
 	NewExitCodeStream(*empty.Empty, MetashellDaemon_NewExitCodeStreamServer) error
 	RegisterCommandEntry(context.Context, *CommandEntry) (*CommandKey, error)
 	Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error)
+	GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
 	mustEmbedUnimplementedMetashellDaemonServer()
 }
 
@@ -226,6 +237,9 @@ func (UnimplementedMetashellDaemonServer) RegisterCommandEntry(context.Context, 
 }
 func (UnimplementedMetashellDaemonServer) Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Metacommand not implemented")
+}
+func (UnimplementedMetashellDaemonServer) GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPluginInfo not implemented")
 }
 func (UnimplementedMetashellDaemonServer) mustEmbedUnimplementedMetashellDaemonServer() {}
 
@@ -297,6 +311,24 @@ func _MetashellDaemon_Metacommand_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MetashellDaemon_GetPluginInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPluginInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetashellDaemonServer).GetPluginInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/shelld.daemon.MetashellDaemon/GetPluginInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetashellDaemonServer).GetPluginInfo(ctx, req.(*GetPluginInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MetashellDaemon_ServiceDesc is the grpc.ServiceDesc for MetashellDaemon service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -311,6 +343,10 @@ var MetashellDaemon_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Metacommand",
 			Handler:    _MetashellDaemon_Metacommand_Handler,
+		},
+		{
+			MethodName: "GetPluginInfo",
+			Handler:    _MetashellDaemon_GetPluginInfo_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

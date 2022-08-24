@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/raphaelreyna/shelld/internal/daemon/plugins"
 	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
 	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
 	godaemon "github.com/sevlyar/go-daemon"
@@ -44,7 +45,7 @@ type Daemon struct {
 	cks                 *cmdKeyService
 	exitCodeStreamChans map[string]chan exitCode
 
-	plugins *plugins
+	plugins *plugins.Plugins
 
 	daemonproto.UnimplementedMetashellDaemonServer
 	daemonproto.UnimplementedShellclientDaemonServer
@@ -116,8 +117,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 		}
 	}
 
-	d.plugins = &plugins{}
-	if err := d.plugins.init(ctx, d.config.PluginsDir); err != nil {
+	d.plugins = &plugins.Plugins{
+		PluginsDir: d.config.PluginsDir,
+	}
+	if err := d.plugins.Reload(ctx); err != nil {
 		return err
 	}
 
@@ -233,20 +236,46 @@ func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 	}()
 
 	go func() {
-		Log.Debug().Msg("running hook")
-		d.plugins.commandReport(context.TODO(), &proto.ReportCommandRequest{
+		Log.Debug().Msg("sending command report to plugins")
+		d.plugins.CommandReport(context.TODO(), &proto.ReportCommandRequest{
 			Command:   v.command,
 			Tty:       v.tty,
 			Timestamp: uint64(v.timestamp),
 			ExitCode:  req.ExitCode,
 		})
-		Log.Debug().Msg("ran hook")
+		Log.Debug().Msg("sent command report to plugins")
 	}()
 
 	return &empty.Empty{}, nil
 }
 
 func (d *Daemon) Metacommand(ctx context.Context, req *daemonproto.MetacommandRequest) (*daemonproto.MetacommandResponse, error) {
-	out, err := d.plugins.metacommand(ctx, req.PluginName, req.MetaCommand)
+	Log.Info().Msg("Metacommand")
+
+	out, err := d.plugins.Metacommand(ctx, req.PluginName, req.MetaCommand, req.Args)
 	return &daemonproto.MetacommandResponse{Out: out}, err
+}
+
+func (d *Daemon) GetPluginInfo(ctx context.Context, req *daemonproto.GetPluginInfoRequest) (*daemonproto.GetPluginInfoResponse, error) {
+	var plugins = make([]*daemonproto.PluginInfo, 0)
+
+	for _, info := range d.plugins.GetMetacommandPluginInfoMatches(req.PluginName) {
+		mcs := make([]*daemonproto.MetacommandInfo, 0)
+		for _, mc := range mcs {
+			if strings.HasPrefix(mc.Name, req.MetacommandName) {
+				mcs = append(mcs, mc)
+			}
+		}
+		if 0 < len(mcs) {
+			plugins = append(plugins, &daemonproto.PluginInfo{
+				Name:                  req.PluginName,
+				AcceptsCommandReports: info.AcceptsReports,
+				Metacommands:          mcs,
+			})
+		}
+	}
+
+	return &daemonproto.GetPluginInfoResponse{
+		Plugins: plugins,
+	}, nil
 }

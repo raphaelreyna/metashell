@@ -23,7 +23,8 @@ var PluginMap = map[string]plugin.Plugin{
 
 type DaemonPlugin interface {
 	ReportCommand(context.Context, *proto.ReportCommandRequest) error
-	Metacommand(context.Context, string) (string, error)
+	Metacommand(context.Context, *proto.MetacommandRequest) (string, error)
+	Info(context.Context) (*proto.PluginInfo, error)
 }
 
 type DaemonPluginImplementation struct {

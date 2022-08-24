@@ -16,8 +16,8 @@ func (c *DaemonPluginClient) ReportCommand(ctx context.Context, rep *proto.Repor
 	return err
 }
 
-func (c *DaemonPluginClient) Metacommand(ctx context.Context, cmd string) (string, error) {
-	resp, err := c.client.Metacommand(ctx, &proto.MetacommandRequest{MetaCommand: cmd})
+func (c *DaemonPluginClient) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (string, error) {
+	resp, err := c.client.Metacommand(ctx, req)
 	if err != nil {
 		return "", err
 	}
@@ -25,6 +25,10 @@ func (c *DaemonPluginClient) Metacommand(ctx context.Context, cmd string) (strin
 		return "", errors.New("got nil response")
 	}
 	return resp.Out, nil
+}
+
+func (c *DaemonPluginClient) Info(ctx context.Context) (*proto.PluginInfo, error) {
+	return c.client.Info(ctx, &proto.Empty{})
 }
 
 type DaemonPluginServer struct {
@@ -37,6 +41,16 @@ func (s *DaemonPluginServer) ReportCommand(ctx context.Context, rep *proto.Repor
 }
 
 func (s *DaemonPluginServer) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (*proto.MetacommandResponse, error) {
-	out, err := s.Impl.Metacommand(ctx, req.MetaCommand)
-	return &proto.MetacommandResponse{Out: out}, err
+	var resp proto.MetacommandResponse
+	out, err := s.Impl.Metacommand(ctx, req)
+	if err != nil {
+		resp.Error = err.Error()
+	}
+	resp.Out = out
+
+	return &resp, err
+}
+
+func (s *DaemonPluginServer) Info(ctx context.Context, _ *proto.Empty) (*proto.PluginInfo, error) {
+	return s.Impl.Info(ctx)
 }
