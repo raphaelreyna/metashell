@@ -145,8 +145,7 @@ func (p *Plugins) Reload(ctx context.Context) error {
 
 		Log.Info().
 			Str("path", path).
-			Str("name", info.Name).
-			Str("version", info.Version).
+			Interface("info", info).
 			Msg("loaded plugin")
 	}
 

@@ -149,10 +149,10 @@ func (d *Daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellD
 		return fmt.Errorf("no tty given in metadata")
 	}
 
+	d.exitCodeStreamChans[tty] = ceChan
 	Log.Info().
 		Str("tty", tty).
 		Msg("registered new tty")
-	d.exitCodeStreamChans[tty] = ceChan
 
 	for {
 		select {
@@ -260,15 +260,20 @@ func (d *Daemon) GetPluginInfo(ctx context.Context, req *daemonproto.GetPluginIn
 	var plugins = make([]*daemonproto.PluginInfo, 0)
 
 	for _, info := range d.plugins.GetMetacommandPluginInfoMatches(req.PluginName) {
-		mcs := make([]*daemonproto.MetacommandInfo, 0)
-		for _, mc := range mcs {
-			if strings.HasPrefix(mc.Name, req.MetacommandName) {
-				mcs = append(mcs, mc)
+		var mcs = make([]*daemonproto.MetacommandInfo, 0)
+
+		for mcName, mcFormat := range info.MetaCommands {
+			if strings.HasPrefix(mcName, req.MetacommandName) {
+				mcs = append(mcs, &daemonproto.MetacommandInfo{
+					Name:   mcName,
+					Format: daemonproto.CommandResponseFormat(mcFormat),
+				})
 			}
 		}
+
 		if 0 < len(mcs) {
 			plugins = append(plugins, &daemonproto.PluginInfo{
-				Name:                  req.PluginName,
+				Name:                  info.Name,
 				AcceptsCommandReports: info.AcceptsReports,
 				Metacommands:          mcs,
 			})
