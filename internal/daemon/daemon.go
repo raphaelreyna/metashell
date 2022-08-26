@@ -9,7 +9,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/raphaelreyna/shelld/internal/daemon/plugins"
 	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
 	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
@@ -55,6 +54,7 @@ func (d *Daemon) termHandler(sig os.Signal) error {
 	Log.Info().
 		Str("signal", sig.String()).
 		Msg("handling termination on signal")
+
 	d.grpcServer.GracefulStop()
 	Log.Info().Msg("stopped gRPC server")
 	if err := d.listener.Close(); err != nil {
@@ -97,35 +97,47 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 	defer cntxt.Release()
 
+	Log.Info().
+		Msg("starting daemon")
+
 	// start of daemon
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
+		Log.Info().
+			Msg("started signal handlers")
 		sig := <-sigChan
 		d.termHandler(sig)
 	}()
 
 	if _, err := os.Stat(d.config.socketPath); err == nil {
 		if err := os.Remove(d.config.socketPath); err != nil {
+			Log.Error().Err(err).
+				Str("path", d.config.socketPath).
+				Msg("error removing old socket")
 			return err
 		}
-	}
 
-	if _, err := os.Stat(d.config.socketPath); err == nil {
-		if err := os.Remove(d.config.socketPath); err != nil {
-			return err
-		}
+		Log.Debug().
+			Str("path", d.config.socketPath).
+			Msg("removed old socket")
 	}
 
 	d.plugins = &plugins.Plugins{
 		PluginsDir: d.config.PluginsDir,
 	}
 	if err := d.plugins.Reload(ctx); err != nil {
+		Log.Error().Err(err).
+			Str("path", d.plugins.PluginsDir).
+			Msg("error loading plugins")
 		return err
 	}
 
 	d.listener, err = net.Listen("unix", d.config.socketPath)
 	if err != nil {
+		Log.Error().Err(err).
+			Str("path", d.config.socketPath).
+			Msg("error listening on unix socket")
 		return err
 	}
 
@@ -135,7 +147,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	return d.grpcServer.Serve(d.listener)
 }
 
-func (d *Daemon) NewExitCodeStream(_ *empty.Empty, server daemonproto.MetashellDaemon_NewExitCodeStreamServer) error {
+func (d *Daemon) NewExitCodeStream(_ *daemonproto.Empty, server daemonproto.MetashellDaemon_NewExitCodeStreamServer) error {
 	ctx := server.Context()
 
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -204,12 +216,12 @@ func (d *Daemon) PreRunQuery(ctx context.Context, req *daemonproto.PreRunQueryRe
 	return &daemonproto.PreRunQueryResponse{Uuid: k}, nil
 }
 
-func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunReportRequest) (*empty.Empty, error) {
+func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunReportRequest) (*daemonproto.Empty, error) {
 	Log.Info().Msg("PostRunReport")
 
 	if req.Uuid == "INIT" {
 		Log.Debug().Msg("got INIT")
-		return &empty.Empty{}, nil
+		return &daemonproto.Empty{}, nil
 	}
 
 	v := d.cks.exchangeKey(req.Uuid)
@@ -217,7 +229,7 @@ func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 		Log.Warn().
 			Str("key", req.Uuid).
 			Msg("could not find vector for key")
-		return &empty.Empty{}, nil
+		return &daemonproto.Empty{}, nil
 	}
 
 	go func() {
@@ -246,14 +258,22 @@ func (d *Daemon) PostRunReport(ctx context.Context, req *daemonproto.PostRunRepo
 		Log.Debug().Msg("sent command report to plugins")
 	}()
 
-	return &empty.Empty{}, nil
+	return &daemonproto.Empty{}, nil
 }
 
 func (d *Daemon) Metacommand(ctx context.Context, req *daemonproto.MetacommandRequest) (*daemonproto.MetacommandResponse, error) {
 	Log.Info().Msg("Metacommand")
 
-	out, err := d.plugins.Metacommand(ctx, req.PluginName, req.MetaCommand, req.Args)
-	return &daemonproto.MetacommandResponse{Out: out}, err
+	resp1, err := d.plugins.Metacommand(ctx, req.PluginName, req.MetaCommand, req.Args)
+	resp2 := &daemonproto.MetacommandResponse{}
+	if err != nil {
+		resp2.Error = err.Error()
+	}
+	if resp1 != nil {
+		resp2.Data = resp1.Data
+	}
+
+	return resp2, err
 }
 
 func (d *Daemon) GetPluginInfo(ctx context.Context, req *daemonproto.GetPluginInfoRequest) (*daemonproto.GetPluginInfoResponse, error) {
@@ -266,7 +286,7 @@ func (d *Daemon) GetPluginInfo(ctx context.Context, req *daemonproto.GetPluginIn
 			if strings.HasPrefix(mcName, req.MetacommandName) {
 				mcs = append(mcs, &daemonproto.MetacommandInfo{
 					Name:   mcName,
-					Format: daemonproto.CommandResponseFormat(mcFormat),
+					Format: daemonproto.MetacommandResponseFormat(mcFormat),
 				})
 			}
 		}

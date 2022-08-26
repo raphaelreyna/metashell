@@ -1,12 +1,13 @@
 syntax = "proto3";
 package shelld.daemon;
-import "google/protobuf/empty.proto";
 
 option go_package = "github.com/raphaelreyna/shelld/rpc/daemon";
 
+message Empty {}
+
 service ShellclientDaemon {
     rpc PreRunQuery(PreRunQueryRequest) returns (PreRunQueryResponse);
-    rpc PostRunReport(PostRunReportRequest) returns (google.protobuf.Empty);
+    rpc PostRunReport(PostRunReportRequest) returns (Empty);
 }
 
 message PreRunReportResponse {
@@ -29,7 +30,7 @@ message PostRunReportRequest {
 }
 
 service MetashellDaemon {
-    rpc NewExitCodeStream(google.protobuf.Empty) returns (stream CommandExitCode);
+    rpc NewExitCodeStream(Empty) returns (stream CommandExitCode);
     rpc RegisterCommandEntry(CommandEntry) returns (CommandKey);
     rpc Metacommand(MetacommandRequest) returns (MetacommandResponse);
     rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse);
@@ -69,7 +70,7 @@ message PluginInfo {
 
 message MetacommandInfo {
     string name = 1;
-    CommandResponseFormat format = 3;
+    MetacommandResponseFormat format = 3;
 }
 
 message MetacommandRequest {
@@ -77,16 +78,19 @@ message MetacommandRequest {
     string meta_command = 2;
     repeated string args = 3;
     repeated string format_args = 4;
+    string tty = 5;
 }
 
 message MetacommandResponse {
-    string out = 1;
+    bytes data = 1;
     string error = 2;
 }
 
-enum CommandResponseFormat {
+enum MetacommandResponseFormat {
     UNSPECIFIED = 0;
-    TEXT = 1;
-    SCREEN = 2;
-    SHELL = 3;
+    TEXT = 1; // string
+    ITEM_LIST = 2; // [{"title": string, "description": string, "filter_value": string}]
+    SCREEN = 3; // string
+    SHELL_INJECTION = 4; // string
+    SHELL_INJECTION_LIST = 5; // [{"title": string, "description": string, "filter_value": string, "shell_injection": ""}]
 }

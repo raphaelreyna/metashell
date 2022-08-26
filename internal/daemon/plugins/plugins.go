@@ -171,10 +171,10 @@ func (p *Plugins) CommandReport(ctx context.Context, rep *proto.ReportCommandReq
 	return nil
 }
 
-func (p *Plugins) Metacommand(ctx context.Context, pluginName, cmd string, args []string) (string, error) {
+func (p *Plugins) Metacommand(ctx context.Context, pluginName, cmd string, args []string) (*proto.MetacommandResponse, error) {
 	h := p.daemonPlugins[pluginName]
 	if h == nil {
-		return "", fmt.Errorf("plugin %s not found", pluginName)
+		return nil, fmt.Errorf("plugin %s not found", pluginName)
 	}
 
 	return h.Metacommand(ctx, &proto.MetacommandRequest{

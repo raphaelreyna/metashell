@@ -4,7 +4,6 @@ package daemon
 
 import (
 	context "context"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,7 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ShellclientDaemonClient interface {
 	PreRunQuery(ctx context.Context, in *PreRunQueryRequest, opts ...grpc.CallOption) (*PreRunQueryResponse, error)
-	PostRunReport(ctx context.Context, in *PostRunReportRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	PostRunReport(ctx context.Context, in *PostRunReportRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type shellclientDaemonClient struct {
@@ -40,8 +39,8 @@ func (c *shellclientDaemonClient) PreRunQuery(ctx context.Context, in *PreRunQue
 	return out, nil
 }
 
-func (c *shellclientDaemonClient) PostRunReport(ctx context.Context, in *PostRunReportRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
+func (c *shellclientDaemonClient) PostRunReport(ctx context.Context, in *PostRunReportRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
 	err := c.cc.Invoke(ctx, "/shelld.daemon.ShellclientDaemon/PostRunReport", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -54,7 +53,7 @@ func (c *shellclientDaemonClient) PostRunReport(ctx context.Context, in *PostRun
 // for forward compatibility
 type ShellclientDaemonServer interface {
 	PreRunQuery(context.Context, *PreRunQueryRequest) (*PreRunQueryResponse, error)
-	PostRunReport(context.Context, *PostRunReportRequest) (*empty.Empty, error)
+	PostRunReport(context.Context, *PostRunReportRequest) (*Empty, error)
 	mustEmbedUnimplementedShellclientDaemonServer()
 }
 
@@ -65,7 +64,7 @@ type UnimplementedShellclientDaemonServer struct {
 func (UnimplementedShellclientDaemonServer) PreRunQuery(context.Context, *PreRunQueryRequest) (*PreRunQueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PreRunQuery not implemented")
 }
-func (UnimplementedShellclientDaemonServer) PostRunReport(context.Context, *PostRunReportRequest) (*empty.Empty, error) {
+func (UnimplementedShellclientDaemonServer) PostRunReport(context.Context, *PostRunReportRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PostRunReport not implemented")
 }
 func (UnimplementedShellclientDaemonServer) mustEmbedUnimplementedShellclientDaemonServer() {}
@@ -141,7 +140,7 @@ var ShellclientDaemon_ServiceDesc = grpc.ServiceDesc{
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MetashellDaemonClient interface {
-	NewExitCodeStream(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (MetashellDaemon_NewExitCodeStreamClient, error)
+	NewExitCodeStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (MetashellDaemon_NewExitCodeStreamClient, error)
 	RegisterCommandEntry(ctx context.Context, in *CommandEntry, opts ...grpc.CallOption) (*CommandKey, error)
 	Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error)
 	GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error)
@@ -155,7 +154,7 @@ func NewMetashellDaemonClient(cc grpc.ClientConnInterface) MetashellDaemonClient
 	return &metashellDaemonClient{cc}
 }
 
-func (c *metashellDaemonClient) NewExitCodeStream(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (MetashellDaemon_NewExitCodeStreamClient, error) {
+func (c *metashellDaemonClient) NewExitCodeStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (MetashellDaemon_NewExitCodeStreamClient, error) {
 	stream, err := c.cc.NewStream(ctx, &MetashellDaemon_ServiceDesc.Streams[0], "/shelld.daemon.MetashellDaemon/NewExitCodeStream", opts...)
 	if err != nil {
 		return nil, err
@@ -218,7 +217,7 @@ func (c *metashellDaemonClient) GetPluginInfo(ctx context.Context, in *GetPlugin
 // All implementations must embed UnimplementedMetashellDaemonServer
 // for forward compatibility
 type MetashellDaemonServer interface {
-	NewExitCodeStream(*empty.Empty, MetashellDaemon_NewExitCodeStreamServer) error
+	NewExitCodeStream(*Empty, MetashellDaemon_NewExitCodeStreamServer) error
 	RegisterCommandEntry(context.Context, *CommandEntry) (*CommandKey, error)
 	Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error)
 	GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
@@ -229,7 +228,7 @@ type MetashellDaemonServer interface {
 type UnimplementedMetashellDaemonServer struct {
 }
 
-func (UnimplementedMetashellDaemonServer) NewExitCodeStream(*empty.Empty, MetashellDaemon_NewExitCodeStreamServer) error {
+func (UnimplementedMetashellDaemonServer) NewExitCodeStream(*Empty, MetashellDaemon_NewExitCodeStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method NewExitCodeStream not implemented")
 }
 func (UnimplementedMetashellDaemonServer) RegisterCommandEntry(context.Context, *CommandEntry) (*CommandKey, error) {
@@ -255,7 +254,7 @@ func RegisterMetashellDaemonServer(s grpc.ServiceRegistrar, srv MetashellDaemonS
 }
 
 func _MetashellDaemon_NewExitCodeStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(empty.Empty)
+	m := new(Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

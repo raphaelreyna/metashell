@@ -14,12 +14,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/creack/pty"
-	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/raphaelreyna/shelld/internal/metashell/metamode"
 	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
 
 	. "github.com/raphaelreyna/shelld/internal/log"
@@ -75,6 +75,8 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 
 	err := ms.ensureDaemon(ctx)
 	if err != nil {
+		Log.Error().Err(err).
+			Msg("error ensuring daemon")
 		return err
 	}
 
@@ -82,6 +84,8 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
+		Log.Error().Err(err).
+			Msg("error dialing daemon")
 		return err
 	}
 	defer ms.grpcConn.Close()
@@ -89,6 +93,8 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 	ms.cmd = exec.CommandContext(ctx, ms.config.ShellPath)
 	ptmx, err := pty.Start(ms.cmd)
 	if err != nil {
+		Log.Error().Err(err).
+			Msg("error starting a new pty")
 		return err
 	}
 	ms.tty = ms.cmd.Stdin.(*os.File).Name()
@@ -97,9 +103,11 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 
 	header := metadata.New(map[string]string{"TTY": ms.tty})
 	ms.ecStream, err = ms.client.NewExitCodeStream(
-		metadata.NewOutgoingContext(ctx, header), &empty.Empty{},
+		metadata.NewOutgoingContext(ctx, header), &daemonproto.Empty{},
 	)
 	if err != nil {
+		Log.Error().Err(err).
+			Msg("error starting new exit code stream")
 		return err
 	}
 
@@ -135,7 +143,8 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 			switch sig {
 			case syscall.SIGWINCH:
 				if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
-					panic(err)
+					Log.Error().Err(err).
+						Msg("error inhereting size for pty")
 				}
 			case syscall.SIGTERM:
 				ms.cmd.Process.Signal(sig)
@@ -152,6 +161,8 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 
 	ms.originalState, err = setTTYSettings(int(os.Stdin.Fd()))
 	if err != nil {
+		Log.Error().Err(err).
+			Msg("error setting tty")
 		return err
 	}
 
@@ -162,6 +173,8 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 	go func() { _, _ = io.Copy(os.Stdout, ptmx) }()
 
 	if _, err := fmt.Fprintf(ptmx, ". <(%s install)\n", os.Args[0]); err != nil {
+		Log.Error().Err(err).
+			Msg("error creating installation command")
 		return err
 	}
 
@@ -190,16 +203,15 @@ func (ms *MetaShell) start(ctx context.Context) {
 		if !cmdIsRunning {
 			switch input[0] {
 			case 27: // ESC
-				mh, err := newMetamodeHandler(ms.client)
-				if err != nil {
+				var mh metamode.Handler
+				p := tea.NewProgram(&mh, tea.WithAltScreen())
+				if err := mh.Initialize(ms.client, p.Quit); err != nil {
 					panic(err)
 				}
-				p := tea.NewProgram(mh, tea.WithAltScreen())
 				if err := p.Start(); err != nil {
 					panic(err)
 				}
-				out := mh.metaCommandOut
-				if out != "" {
+				if out := mh.GetShellInjection(); out != "" {
 					ms.out.Write([]byte(out))
 				}
 			case 13: // \n

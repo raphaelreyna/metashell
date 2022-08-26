@@ -13,19 +13,22 @@ message ReportCommandRequest {
 message MetacommandRequest {
     string meta_command = 1;
     repeated string args = 2;
-    repeated string format_args = 4;
+    repeated string format_args = 3;
+    string tty = 4;
 }
 
 message MetacommandResponse {
-    string out = 1;
+    bytes data = 1;
     string error = 2;
 }
 
 enum MetacommandResponseFormat {
     UNSPECIFIED = 0;
-    TEXT = 1;
-    SCREEN = 2;
-    SHELL = 3;
+    TEXT = 1; // string
+    ITEM_LIST = 2; // [{"title": string, "description": string, "filter_value": string}]
+    SCREEN = 3; // string
+    SHELL_INJECTION = 4; // string
+    SHELL_INJECTION_LIST = 5; // [{"title": string, "description": string, "filter_value": string, "value": ""}]
 }
 
 message PluginInfo {

@@ -16,15 +16,15 @@ func (c *DaemonPluginClient) ReportCommand(ctx context.Context, rep *proto.Repor
 	return err
 }
 
-func (c *DaemonPluginClient) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (string, error) {
+func (c *DaemonPluginClient) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (*proto.MetacommandResponse, error) {
 	resp, err := c.client.Metacommand(ctx, req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if resp == nil {
-		return "", errors.New("got nil response")
+		return nil, errors.New("got nil response")
 	}
-	return resp.Out, nil
+	return resp, nil
 }
 
 func (c *DaemonPluginClient) Info(ctx context.Context) (*proto.PluginInfo, error) {
@@ -41,14 +41,12 @@ func (s *DaemonPluginServer) ReportCommand(ctx context.Context, rep *proto.Repor
 }
 
 func (s *DaemonPluginServer) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (*proto.MetacommandResponse, error) {
-	var resp proto.MetacommandResponse
-	out, err := s.Impl.Metacommand(ctx, req)
+	resp, err := s.Impl.Metacommand(ctx, req)
 	if err != nil {
 		resp.Error = err.Error()
 	}
-	resp.Out = out
 
-	return &resp, err
+	return resp, err
 }
 
 func (s *DaemonPluginServer) Info(ctx context.Context, _ *proto.Empty) (*proto.PluginInfo, error) {
