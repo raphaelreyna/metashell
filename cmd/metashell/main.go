@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 func main() {

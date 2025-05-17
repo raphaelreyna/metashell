@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
 )
 
 type DaemonPluginClient struct {

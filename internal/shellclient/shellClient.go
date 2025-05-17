@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
+	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 const SubCommandShellClient = "shellclient"

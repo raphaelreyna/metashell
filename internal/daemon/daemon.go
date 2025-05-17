@@ -9,14 +9,14 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/raphaelreyna/shelld/internal/daemon/plugins"
-	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/internal/daemon/plugins"
+	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
 	godaemon "github.com/sevlyar/go-daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 const SubCommandDaemon = "daemon"

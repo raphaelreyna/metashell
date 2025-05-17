@@ -4,11 +4,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/raphaelreyna/shelld/internal/cli"
-	"github.com/raphaelreyna/shelld/internal/daemon"
-	"github.com/raphaelreyna/shelld/internal/installer"
-	"github.com/raphaelreyna/shelld/internal/metashell"
-	"github.com/raphaelreyna/shelld/internal/shellclient"
+	"github.com/raphaelreyna/metashell/internal/cli"
+	"github.com/raphaelreyna/metashell/internal/daemon"
+	"github.com/raphaelreyna/metashell/internal/installer"
+	"github.com/raphaelreyna/metashell/internal/metashell"
+	"github.com/raphaelreyna/metashell/internal/shellclient"
 	"gopkg.in/yaml.v3"
 )
 

@@ -19,10 +19,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/raphaelreyna/shelld/internal/metashell/metamode"
-	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
+	"github.com/raphaelreyna/metashell/internal/metashell/metamode"
+	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 type MetaShell struct {

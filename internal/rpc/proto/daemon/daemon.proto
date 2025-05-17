@@ -1,7 +1,7 @@
 syntax = "proto3";
-package shelld.daemon;
+package metashell.daemon;
 
-option go_package = "github.com/raphaelreyna/shelld/rpc/daemon";
+option go_package = "github.com/raphaelreyna/metashell/rpc/daemon";
 
 message Empty {}
 

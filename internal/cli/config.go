@@ -3,7 +3,7 @@ package cli
 import (
 	"path/filepath"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 type Config struct {

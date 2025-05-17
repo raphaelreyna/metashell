@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto/shared"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/shared"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 type PluginInfo struct {

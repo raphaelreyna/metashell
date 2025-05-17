@@ -12,8 +12,8 @@ import (
 	json "encoding/json"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto/shared"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/shared"
 )
 
 type handler struct {
@@ -113,7 +113,7 @@ func main() {
 	h := &handler{stderr: bytes.NewBuffer(nil)}
 	log.SetOutput(h.stderr)
 
-	go http.ListenAndServe(":8080", h)
+	go http.ListenAndServe(":8086", h)
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: shared.Handshake,
 		Plugins: map[string]plugin.Plugin{

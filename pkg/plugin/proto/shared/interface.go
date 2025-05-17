@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/raphaelreyna/shelld/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
 	"google.golang.org/grpc"
 )
 

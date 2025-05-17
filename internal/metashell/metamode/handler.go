@@ -5,9 +5,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	daemonproto "github.com/raphaelreyna/shelld/internal/rpc/go/daemon"
+	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
 
-	. "github.com/raphaelreyna/shelld/internal/log"
+	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 type rootScreen interface {
