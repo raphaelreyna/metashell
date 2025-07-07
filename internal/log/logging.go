@@ -44,10 +44,6 @@ func GetLogLevel() string {
 	return logger.GetLevel().String()
 }
 
-func OutFilePath() string {
-	return logger.OutFilePath()
-}
-
 func SetLog(level, root, component string) error {
 	logger = &Logger{}
 	return logger.init(level, filepath.Join(root, "logs"), component)

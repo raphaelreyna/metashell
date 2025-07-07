@@ -10,19 +10,15 @@ type Config struct {
 }
 
 func (c Config) NewMetaShell(rootDir string) *MetaShell {
-	c.socketPath = filepath.Join(rootDir, "daemon.socket")
+	return &MetaShell{config: c}
+}
+
+func (c *Config) SetDefaults(rootDir string) {
 	if c.ShellPath == "" {
 		c.ShellPath = "/bin/bash"
 	}
 	if c.PluginsDir == "" {
 		c.PluginsDir = filepath.Join(rootDir, "plugins", "metashell")
 	}
-	return &MetaShell{config: c}
-}
-
-func DefaultConfig(rootPath string) Config {
-	return Config{
-		ShellPath:  "/bin/bash",
-		PluginsDir: filepath.Join(rootPath, "plugins", "metashell"),
-	}
+	c.socketPath = filepath.Join(rootDir, "daemon.socket")
 }

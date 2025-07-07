@@ -285,7 +285,7 @@ func (ms *MetaShell) ensureDaemon(ctx context.Context) error {
 		return err
 	}
 
-	cmd := exec.Command(os.Args[0], "daemon")
+	cmd := exec.Command(os.Args[0], "daemon", "start")
 	_, err = cmd.CombinedOutput()
 	if err == nil {
 		time.Sleep(500 * time.Millisecond)

@@ -20,12 +20,12 @@ __preRun() {
 			;;
 		*)
 			TTY=$(tty)
-			METASHELL_CMD_KEY=$($EXEC -tty $TTY -cmd "$BASH_COMMAND")
+			METASHELL_CMD_KEY=$($EXEC --tty $TTY --cmd "$BASH_COMMAND")
 	esac
 }
 
 __postRun() {
-	$EXEC -cmdKey $METASHELL_CMD_KEY -exit-code $?
+	$EXEC --cmdKey $METASHELL_CMD_KEY --exit-code $?
 }
 `
 )

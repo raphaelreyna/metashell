@@ -79,8 +79,6 @@ func (d *Daemon) Run(ctx context.Context) error {
 	cntxt := &godaemon.Context{
 		PidFileName: d.config.PidFileName,
 		PidFilePerm: 0644,
-		LogFileName: d.config.LogFileName,
-		LogFilePerm: 0640,
 		WorkDir:     d.config.WorkDir,
 		Umask:       027,
 	}

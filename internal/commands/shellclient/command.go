@@ -2,21 +2,21 @@ package shellclient
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/raphaelreyna/metashell/internal/config"
 	"github.com/raphaelreyna/metashell/internal/log"
 	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const SubCommandShellClient = "shellclient"
-
-type ShellClient struct {
-	config Config
+type Cmd struct {
+	command *cobra.Command
+	config  *config.Config
 
 	tty      string
 	cmd      string
@@ -24,18 +24,39 @@ type ShellClient struct {
 	exitCode int
 }
 
-func (sc *ShellClient) parseFlags() {
-	fs := flag.NewFlagSet("shellclient", flag.PanicOnError)
-	fs.StringVar(&sc.tty, "tty", "", "internal")
-	fs.StringVar(&sc.cmd, "cmd", "", "internal")
-	fs.StringVar(&sc.cmdKey, "cmdKey", "", "internal")
-	fs.IntVar(&sc.exitCode, "exit-code", -1, "internal")
-
-	fs.Parse(os.Args[2:])
+func New(config *config.Config) *Cmd {
+	return &Cmd{
+		config: config,
+	}
 }
 
-func (sc *ShellClient) Run(ctx context.Context) error {
-	sc.parseFlags()
+func (c *Cmd) Cobra() *cobra.Command {
+	if c.command != nil {
+		return c.command
+	}
+
+	c.command = &cobra.Command{
+		Use:   "shellclient",
+		Short: "Run the metashell shell client",
+		Long:  "Run the metashell shell client to interact with the metashell daemon.",
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			log.SetLog(c.config.LogLevel, c.config.RootDir, "shellclient")
+			return nil
+		},
+		RunE: c.Run,
+	}
+
+	fs := c.command.Flags()
+	fs.StringVar(&c.tty, "tty", "", "internal")
+	fs.StringVar(&c.cmd, "cmd", "", "internal")
+	fs.StringVar(&c.cmdKey, "cmdKey", "", "internal")
+	fs.IntVar(&c.exitCode, "exit-code", -1, "internal")
+
+	return c.command
+}
+
+func (sc *Cmd) Run(cmd *cobra.Command, _ []string) error {
+	ctx := cmd.Context()
 
 	logEvent := log.With("args", os.Args)
 
@@ -58,12 +79,12 @@ func (sc *ShellClient) Run(ctx context.Context) error {
 	return fmt.Errorf("invalid flag combination")
 }
 
-func (r *ShellClient) recordExitCode(ctx context.Context) error {
+func (r *Cmd) recordExitCode(ctx context.Context) error {
 	if r.exitCode < 0 {
 		panic("exit code not set")
 	}
 
-	conn, err := grpc.Dial("unix://"+r.config.socketPath,
+	conn, err := grpc.Dial("unix://"+r.config.Daemon.SocketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -79,8 +100,8 @@ func (r *ShellClient) recordExitCode(ctx context.Context) error {
 	return err
 }
 
-func (r *ShellClient) requestID(ctx context.Context) error {
-	conn, err := grpc.Dial("unix://"+r.config.socketPath,
+func (r *Cmd) requestID(ctx context.Context) error {
+	conn, err := grpc.Dial("unix://"+r.config.Daemon.SocketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
