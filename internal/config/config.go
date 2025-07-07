@@ -5,14 +5,12 @@ import (
 	"path/filepath"
 
 	"github.com/raphaelreyna/metashell/internal/daemon"
-	"github.com/raphaelreyna/metashell/internal/installer"
 	"github.com/raphaelreyna/metashell/internal/metashell"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	Daemon    daemon.Config    `yaml:"daemon"`
-	Installer installer.Config `yaml:"installer"`
 	MetaShell metashell.Config `yaml:"metashell"`
 	LogLevel  string           `yaml:"log_level"`
 
@@ -36,7 +34,6 @@ func ParseConfig() (*Config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			c.Daemon.SetDefaults(c.RootDir)
-			c.Installer.SetDefaults(c.RootDir)
 			c.MetaShell.SetDefaults(c.RootDir)
 			c.LogLevel = "INFO"
 		}
@@ -50,7 +47,6 @@ func ParseConfig() (*Config, error) {
 	}
 
 	c.Daemon.SetDefaults(c.RootDir)
-	c.Installer.SetDefaults(c.RootDir)
 	c.MetaShell.SetDefaults(c.RootDir)
 	if c.LogLevel == "" {
 		c.LogLevel = "INFO"
