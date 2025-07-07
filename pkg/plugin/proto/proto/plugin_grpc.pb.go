@@ -22,6 +22,7 @@ const (
 	DaemonPlugin_ReportCommand_FullMethodName = "/proto.DaemonPlugin/ReportCommand"
 	DaemonPlugin_Metacommand_FullMethodName   = "/proto.DaemonPlugin/Metacommand"
 	DaemonPlugin_Info_FullMethodName          = "/proto.DaemonPlugin/Info"
+	DaemonPlugin_Init_FullMethodName          = "/proto.DaemonPlugin/Init"
 )
 
 // DaemonPluginClient is the client API for DaemonPlugin service.
@@ -31,6 +32,7 @@ type DaemonPluginClient interface {
 	ReportCommand(ctx context.Context, in *ReportCommandRequest, opts ...grpc.CallOption) (*Empty, error)
 	Metacommand(ctx context.Context, in *MetacommandRequest, opts ...grpc.CallOption) (*MetacommandResponse, error)
 	Info(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginInfo, error)
+	Init(ctx context.Context, in *PluginConfig, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type daemonPluginClient struct {
@@ -71,6 +73,16 @@ func (c *daemonPluginClient) Info(ctx context.Context, in *Empty, opts ...grpc.C
 	return out, nil
 }
 
+func (c *daemonPluginClient) Init(ctx context.Context, in *PluginConfig, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, DaemonPlugin_Init_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DaemonPluginServer is the server API for DaemonPlugin service.
 // All implementations must embed UnimplementedDaemonPluginServer
 // for forward compatibility
@@ -78,6 +90,7 @@ type DaemonPluginServer interface {
 	ReportCommand(context.Context, *ReportCommandRequest) (*Empty, error)
 	Metacommand(context.Context, *MetacommandRequest) (*MetacommandResponse, error)
 	Info(context.Context, *Empty) (*PluginInfo, error)
+	Init(context.Context, *PluginConfig) (*Empty, error)
 	mustEmbedUnimplementedDaemonPluginServer()
 }
 
@@ -93,6 +106,9 @@ func (UnimplementedDaemonPluginServer) Metacommand(context.Context, *Metacommand
 }
 func (UnimplementedDaemonPluginServer) Info(context.Context, *Empty) (*PluginInfo, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
+}
+func (UnimplementedDaemonPluginServer) Init(context.Context, *PluginConfig) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Init not implemented")
 }
 func (UnimplementedDaemonPluginServer) mustEmbedUnimplementedDaemonPluginServer() {}
 
@@ -161,6 +177,24 @@ func _DaemonPlugin_Info_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DaemonPlugin_Init_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginConfig)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonPluginServer).Init(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonPlugin_Init_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonPluginServer).Init(ctx, req.(*PluginConfig))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DaemonPlugin_ServiceDesc is the grpc.ServiceDesc for DaemonPlugin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -179,6 +213,10 @@ var DaemonPlugin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Info",
 			Handler:    _DaemonPlugin_Info_Handler,
+		},
+		{
+			MethodName: "Init",
+			Handler:    _DaemonPlugin_Init_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

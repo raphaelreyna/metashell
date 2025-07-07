@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -11,7 +12,7 @@ import (
 
 	"github.com/raphaelreyna/metashell/internal/daemon/plugins"
 	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
-	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 	godaemon "github.com/sevlyar/go-daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -80,11 +81,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.exitCodeStreamChans = make(map[string]chan exitCode)
 
 	cntxt := &godaemon.Context{
-		PidFileName: d.config.pidFileName,
+		PidFileName: d.config.PidFileName,
 		PidFilePerm: 0644,
-		LogFileName: d.config.logFileName,
+		LogFileName: d.config.LogFileName,
 		LogFilePerm: 0640,
-		WorkDir:     d.config.workDir,
+		WorkDir:     d.config.WorkDir,
 		Umask:       027,
 	}
 
@@ -110,21 +111,36 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.termHandler(sig)
 	}()
 
-	if _, err := os.Stat(d.config.socketPath); err == nil {
-		if err := os.Remove(d.config.socketPath); err != nil {
+	if _, err := os.Stat(d.config.SocketPath); err == nil {
+		if err := os.Remove(d.config.SocketPath); err != nil {
 			Log.Error().Err(err).
-				Str("path", d.config.socketPath).
+				Str("path", d.config.SocketPath).
 				Msg("error removing old socket")
 			return err
 		}
 
 		Log.Debug().
-			Str("path", d.config.socketPath).
+			Str("path", d.config.SocketPath).
 			Msg("removed old socket")
 	}
 
 	d.plugins = &plugins.Plugins{
 		PluginsDir: d.config.PluginsDir,
+		ConfigsCallback: func() (map[string][]byte, error) {
+			// TODO(raphaelreyna): do this in a more efficient way
+			m := make(map[string][]byte, len(d.config.PluginConfigs))
+			for k, v := range d.config.PluginConfigs {
+				jsonData, err := json.Marshal(v)
+				if err != nil {
+					Log.Error().Err(err).
+						Str("key", k).
+						Msg("error marshalling plugin config")
+					return nil, err
+				}
+				m[k] = jsonData
+			}
+			return m, nil
+		},
 	}
 	if err := d.plugins.Reload(ctx); err != nil {
 		Log.Error().Err(err).
@@ -133,10 +149,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return err
 	}
 
-	d.listener, err = net.Listen("unix", d.config.socketPath)
+	d.listener, err = net.Listen("unix", d.config.SocketPath)
 	if err != nil {
 		Log.Error().Err(err).
-			Str("path", d.config.socketPath).
+			Str("path", d.config.SocketPath).
 			Msg("error listening on unix socket")
 		return err
 	}

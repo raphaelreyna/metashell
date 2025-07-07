@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 )
 
 type DaemonPluginClient struct {
@@ -31,6 +31,11 @@ func (c *DaemonPluginClient) Info(ctx context.Context) (*proto.PluginInfo, error
 	return c.client.Info(ctx, &proto.Empty{})
 }
 
+func (c *DaemonPluginClient) Init(ctx context.Context, config *proto.PluginConfig) error {
+	_, err := c.client.Init(ctx, config)
+	return err
+}
+
 type DaemonPluginServer struct {
 	proto.UnimplementedDaemonPluginServer
 	Impl DaemonPlugin
@@ -51,4 +56,11 @@ func (s *DaemonPluginServer) Metacommand(ctx context.Context, req *proto.Metacom
 
 func (s *DaemonPluginServer) Info(ctx context.Context, _ *proto.Empty) (*proto.PluginInfo, error) {
 	return s.Impl.Info(ctx)
+}
+
+func (s *DaemonPluginServer) Init(ctx context.Context, config *proto.PluginConfig) (*proto.Empty, error) {
+	if err := s.Impl.Init(ctx, config); err != nil {
+		return &proto.Empty{}, err
+	}
+	return &proto.Empty{}, nil
 }

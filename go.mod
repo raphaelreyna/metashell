@@ -6,7 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/golang/protobuf v1.5.4
+	github.com/golang/protobuf v1.5.4 // indirect
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.5
 )

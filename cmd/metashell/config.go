@@ -13,11 +13,11 @@ import (
 )
 
 type Config struct {
-	Daemon      daemon.Config
-	Installer   installer.Config
-	MetaShell   metashell.Config
-	Client      cli.Config
-	ShellClient shellclient.Config
+	Daemon      daemon.Config      `yaml:"daemon"`
+	Installer   installer.Config   `yaml:"installer"`
+	MetaShell   metashell.Config   `yaml:"metashell"`
+	Client      cli.Config         `yaml:"client"`
+	ShellClient shellclient.Config `yaml:"shellclient"`
 
 	rootDir string
 }

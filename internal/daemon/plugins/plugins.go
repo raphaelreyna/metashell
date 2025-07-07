@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 	"github.com/raphaelreyna/metashell/pkg/plugin/proto/shared"
 
 	. "github.com/raphaelreyna/metashell/internal/log"
@@ -22,7 +22,8 @@ type PluginInfo struct {
 }
 
 type Plugins struct {
-	PluginsDir string
+	PluginsDir      string
+	ConfigsCallback func() (map[string][]byte, error)
 
 	clients       []*plugin.Client
 	daemonPlugins map[string]shared.DaemonPlugin
@@ -64,13 +65,19 @@ func (p *Plugins) GetMetacommandPluginInfoMatches(pluginName string) []PluginInf
 }
 
 func (p *Plugins) Reload(ctx context.Context) error {
-	if err := p.Close(); err != nil {
+	err := p.Close()
+	if err != nil {
 		return err
 	}
 
 	p.clients = make([]*plugin.Client, 0)
 	p.daemonPlugins = make(map[string]shared.DaemonPlugin)
 	p.info = make(map[string]PluginInfo)
+
+	configs, err := p.ConfigsCallback()
+	if err != nil {
+		return fmt.Errorf("error getting plugin configs: %w", err)
+	}
 
 	entries, err := os.ReadDir(p.PluginsDir)
 	if err != nil {
@@ -128,6 +135,31 @@ func (p *Plugins) Reload(ctx context.Context) error {
 				Str("path", path).
 				Err(err).
 				Msg("unable to get plugin info, skipping")
+		}
+
+		// Validate plugin info
+		if info == nil {
+			Log.Warn().
+				Str("path", path).
+				Msg("plugin info is nil, skipping")
+			continue
+		}
+		if info.Name == "" {
+			Log.Warn().
+				Str("path", path).
+				Msg("plugin info name is empty, skipping")
+			continue
+		}
+		// TODO(raphaelreyna): Validate plugin info version
+
+		if err := h.Init(ctx, &proto.PluginConfig{
+			Data: configs[info.Name],
+		}); err != nil {
+			Log.Warn().
+				Str("path", path).
+				Err(err).
+				Msg("error initializing plugin, skipping")
+			continue
 		}
 
 		pi := PluginInfo{

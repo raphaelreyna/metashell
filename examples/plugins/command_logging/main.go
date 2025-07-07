@@ -12,13 +12,14 @@ import (
 	json "encoding/json"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 	"github.com/raphaelreyna/metashell/pkg/plugin/proto/shared"
 )
 
 type handler struct {
-	history []string
-	stderr  *bytes.Buffer
+	history     []string
+	stderr      *bytes.Buffer
+	configBytes []byte
 }
 
 func (h *handler) ReportCommand(ctx context.Context, rep *proto.ReportCommandRequest) error {
@@ -71,7 +72,7 @@ func (h *handler) Metacommand(ctx context.Context, req *proto.MetacommandRequest
 func (h *handler) Info(ctx context.Context) (*proto.PluginInfo, error) {
 	log.Println("called:: Info")
 	return &proto.PluginInfo{
-		Name:                  "p1",
+		Name:                  "logging",
 		Version:               "v0.0.1",
 		AcceptsCommandReports: true,
 		Metacommands: []*proto.MetacommandInfo{
@@ -85,6 +86,11 @@ func (h *handler) Info(ctx context.Context) (*proto.PluginInfo, error) {
 			},
 		},
 	}, nil
+}
+
+func (h *handler) Init(ctx context.Context, config *proto.PluginConfig) error {
+	h.configBytes = config.Data
+	return nil
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

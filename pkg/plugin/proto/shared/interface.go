@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/raphaelreyna/metashell/pkg/plugin/proto"
+	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 	"google.golang.org/grpc"
 )
 
@@ -25,6 +25,7 @@ type DaemonPlugin interface {
 	ReportCommand(context.Context, *proto.ReportCommandRequest) error
 	Metacommand(context.Context, *proto.MetacommandRequest) (*proto.MetacommandResponse, error)
 	Info(context.Context) (*proto.PluginInfo, error)
+	Init(context.Context, *proto.PluginConfig) error
 }
 
 type DaemonPluginImplementation struct {

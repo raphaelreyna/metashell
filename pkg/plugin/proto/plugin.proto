@@ -43,8 +43,13 @@ message MetacommandInfo {
     MetacommandResponseFormat format = 3;
 }
 
+message PluginConfig {
+    bytes data = 1;
+}
+
 service DaemonPlugin {
     rpc ReportCommand(ReportCommandRequest) returns (Empty);
     rpc Metacommand(MetacommandRequest) returns (MetacommandResponse);
     rpc Info(Empty) returns (PluginInfo);
+    rpc Init(PluginConfig) returns (Empty);
 }
