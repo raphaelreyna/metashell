@@ -7,14 +7,54 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/hashicorp/go-hclog"
 )
 
-var Log *Logger
+var logger *Logger
 
-func SetLog(root, component string) error {
-	Log = &Logger{}
-	return Log.init(filepath.Join(root, "logs"), component)
+func Info(msg string, args ...any) {
+	logger.Info(msg, args...)
+}
+
+func Debug(msg string, args ...any) {
+	logger.Debug(msg, args...)
+}
+
+func Warn(msg string, args ...any) {
+	logger.Warn(msg, args...)
+}
+
+func Error(msg string, err error, args ...any) {
+	logger.Error(msg, append(args, "error", err)...)
+}
+
+func Named(name string) hclog.Logger {
+	return logger.Named(name)
+}
+
+func With(args ...any) hclog.Logger {
+	if len(args)%2 != 0 {
+		panic("With() requires an even number of arguments")
+	}
+
+	return logger.With(args...)
+}
+
+func GetLogLevel() string {
+	return logger.GetLevel().String()
+}
+
+func OutFilePath() string {
+	return logger.OutFilePath()
+}
+
+func SetLog(level, root, component string) error {
+	logger = &Logger{}
+	return logger.init(level, filepath.Join(root, "logs"), component)
+}
+
+func GetLogger() hclog.Logger {
+	return logger
 }
 
 type Logger struct {
@@ -22,7 +62,7 @@ type Logger struct {
 	component string
 	dir       string
 
-	zerolog.Logger
+	hclog.Logger
 	sync.Mutex
 }
 
@@ -49,7 +89,14 @@ func (l *Logger) rotate() error {
 	return err
 }
 
-func (l *Logger) init(root, component string) error {
+func (l *Logger) init(level, root, component string) error {
+	if level == "" {
+		level = "INFO"
+	}
+	if level != "DEBUG" && level != "INFO" && level != "WARN" && level != "ERROR" {
+		return fmt.Errorf("invalid log level: %s", level)
+	}
+
 	l.dir = filepath.Join(root, component)
 
 	if err := ensureDir(l.dir); err != nil {
@@ -61,10 +108,12 @@ func (l *Logger) init(root, component string) error {
 	}
 
 	l.component = component
-	l.Logger = zerolog.New(l).
-		With().
-		Str("component", l.component).
-		Logger()
+	l.Logger = hclog.New(&hclog.LoggerOptions{
+		Name:       component,
+		Level:      hclog.LevelFromString(level),
+		JSONFormat: true,
+		Output:     l.out,
+	})
 
 	return nil
 }

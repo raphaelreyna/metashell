@@ -3,7 +3,7 @@ package cli
 import (
 	"path/filepath"
 
-	. "github.com/raphaelreyna/metashell/internal/log"
+	"github.com/raphaelreyna/metashell/internal/log"
 )
 
 type Config struct {
@@ -16,7 +16,7 @@ type Config struct {
 func (c Config) NewClient(rootDir string) *Client {
 	c.socketPath = filepath.Join(rootDir, "daemon.socket")
 	c.workDir = rootDir
-	c.logFileName = Log.OutFilePath()
+	c.logFileName = log.OutFilePath()
 	c.pidFileName = filepath.Join(rootDir, "daemon.pid")
 
 	return &Client{config: c}

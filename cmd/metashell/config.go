@@ -18,6 +18,7 @@ type Config struct {
 	MetaShell   metashell.Config   `yaml:"metashell"`
 	Client      cli.Config         `yaml:"client"`
 	ShellClient shellclient.Config `yaml:"shellclient"`
+	LogLevel    string             `yaml:"log_level"`
 
 	rootDir string
 }

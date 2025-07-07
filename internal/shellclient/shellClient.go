@@ -7,11 +7,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/raphaelreyna/metashell/internal/log"
 	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 const SubCommandShellClient = "shellclient"
@@ -38,8 +37,7 @@ func (sc *ShellClient) parseFlags() {
 func (sc *ShellClient) Run(ctx context.Context) error {
 	sc.parseFlags()
 
-	logEvent := Log.Info().
-		Strs("args", os.Args)
+	logEvent := log.With("args", os.Args)
 
 	var (
 		runRecordExitCode     = -1 < sc.exitCode && sc.cmdKey != ""
@@ -50,10 +48,10 @@ func (sc *ShellClient) Run(ctx context.Context) error {
 	case runPreRunQueryRequest && runRecordExitCode:
 		break
 	case runPreRunQueryRequest:
-		logEvent.Str("mode", "preRunQuery").Msg("ran")
+		logEvent.Info("ran", "mode", "preRunQuery")
 		return sc.requestID(ctx)
 	case runRecordExitCode:
-		logEvent.Str("mode", "postRunReport").Msg("ran")
+		logEvent.Info("ran", "mode", "postRunReport")
 		return sc.recordExitCode(ctx)
 	}
 

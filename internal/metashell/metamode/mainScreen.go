@@ -9,9 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/raphaelreyna/metashell/internal/log"
 	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
-
-	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 var (
@@ -76,8 +75,7 @@ func (ms *mainScreen) Update(msg tea.Msg) (screen, tea.Cmd) {
 		case "enter":
 			var pn, mn, args = ms.parsedInput()
 			if err := ms.execMetacommand(context.TODO(), pn, mn, args); err != nil {
-				Log.Error().Err(err).
-					Msg("error executing metacommand")
+				log.Error("error executing metacommand", err)
 			}
 			return ms, nil
 		}
@@ -168,6 +166,14 @@ func (ms *mainScreen) execMetacommand(ctx context.Context, plugin, metacommand s
 		})
 	case daemonproto.MetacommandResponseFormat_SCREEN:
 		ms.next("fullscreen", string(resp.Data))
+	default:
+		// TODO(raphaelreyna): add remaining formats
+		log.Warn("unknown or unimplemented metacommand response format",
+			"plugin", plugin,
+			"metacommand", metacommand,
+			"format", format,
+			"data", string(resp.Data),
+		)
 	}
 
 	return nil

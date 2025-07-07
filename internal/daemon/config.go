@@ -3,7 +3,7 @@ package daemon
 import (
 	"path/filepath"
 
-	. "github.com/raphaelreyna/metashell/internal/log"
+	"github.com/raphaelreyna/metashell/internal/log"
 )
 
 type Config struct {
@@ -26,7 +26,7 @@ func (c *Config) NewDaemon(rootDir string) *Daemon {
 		c.WorkDir = rootDir
 	}
 	if c.LogFileName == "" {
-		c.LogFileName = Log.OutFilePath()
+		c.LogFileName = log.OutFilePath()
 	}
 	if c.PluginsDir == "" {
 		c.PluginsDir = filepath.Join(rootDir, "plugins", "daemon")
@@ -43,7 +43,7 @@ func DefaultConfig(rootDir string) Config {
 		SocketPath:    filepath.Join(rootDir, "daemon.socket"),
 		PidFileName:   filepath.Join(rootDir, "daemon.pid"),
 		WorkDir:       rootDir,
-		LogFileName:   Log.OutFilePath(),
+		LogFileName:   log.OutFilePath(),
 		PluginsDir:    filepath.Join(rootDir, "plugins", "daemon"),
 		PluginConfigs: make(map[string]any),
 	}

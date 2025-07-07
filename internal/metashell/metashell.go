@@ -19,10 +19,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/raphaelreyna/metashell/internal/log"
 	"github.com/raphaelreyna/metashell/internal/metashell/metamode"
 	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
-
-	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 type MetaShell struct {
@@ -75,8 +74,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 
 	err := ms.ensureDaemon(ctx)
 	if err != nil {
-		Log.Error().Err(err).
-			Msg("error ensuring daemon")
+		log.Error("error ensuring daemon", err)
 		return err
 	}
 
@@ -84,8 +82,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		Log.Error().Err(err).
-			Msg("error dialing daemon")
+		log.Error("error dialing daemon", err)
 		return err
 	}
 	defer ms.grpcConn.Close()
@@ -93,8 +90,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 	ms.cmd = exec.CommandContext(ctx, ms.config.ShellPath)
 	ptmx, err := pty.Start(ms.cmd)
 	if err != nil {
-		Log.Error().Err(err).
-			Msg("error starting a new pty")
+		log.Error("error starting pty", err)
 		return err
 	}
 	ms.tty = ms.cmd.Stdin.(*os.File).Name()
@@ -106,20 +102,17 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 		metadata.NewOutgoingContext(ctx, header), &daemonproto.Empty{},
 	)
 	if err != nil {
-		Log.Error().Err(err).
-			Msg("error starting new exit code stream")
+		log.Error("error starting new exit code stream", err)
 		return err
 	}
 
 	go func() {
 		var err error
 		for {
-			Log.Info().Msg("received exit code")
+			log.Debug("received exit code")
 			_, err = ms.ecStream.Recv()
 			if err != nil {
-				Log.Error().
-					Err(err).
-					Msg("error reading from exit code stream")
+				log.Error("error reading from exit code stream", err)
 				return
 			}
 			ms.Lock()
@@ -143,8 +136,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 			switch sig {
 			case syscall.SIGWINCH:
 				if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
-					Log.Error().Err(err).
-						Msg("error inhereting size for pty")
+					log.Error("error inheriting size for pty", err)
 				}
 			case syscall.SIGTERM:
 				ms.cmd.Process.Signal(sig)
@@ -161,8 +153,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 
 	ms.originalState, err = setTTYSettings(int(os.Stdin.Fd()))
 	if err != nil {
-		Log.Error().Err(err).
-			Msg("error setting tty")
+		log.Error("error setting tty", err)
 		return err
 	}
 
@@ -173,8 +164,7 @@ func (ms *MetaShell) Run(ctx context.Context) error {
 	go func() { _, _ = io.Copy(os.Stdout, ptmx) }()
 
 	if _, err := fmt.Fprintf(ptmx, ". <(%s install)\n", os.Args[0]); err != nil {
-		Log.Error().Err(err).
-			Msg("error creating installation command")
+		log.Error("error creating installation command", err)
 		return err
 	}
 
@@ -215,16 +205,14 @@ func (ms *MetaShell) start(ctx context.Context) {
 					ms.out.Write([]byte(out))
 				}
 			case 13: // \n
-				Log.Info().Msg("registering")
+				log.Debug("registering")
 				_, err := ms.client.RegisterCommandEntry(ctx, &daemonproto.CommandEntry{
 					Command:   ms.cmdBuffer,
 					Tty:       ms.tty,
 					Timestamp: time.Now().Unix(),
 				})
 				if err != nil {
-					Log.Error().
-						Err(err).
-						Msg("error registering command with daemon")
+					log.Error("error registering command with daemon", err)
 				}
 
 				ms.cmdBuffer = ""

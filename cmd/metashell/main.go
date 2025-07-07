@@ -32,7 +32,7 @@ func run(ctx context.Context) error {
 	}
 	rootDir := config.rootDir
 
-	if err := SetLog(rootDir, subcommand); err != nil {
+	if err := SetLog(config.LogLevel, rootDir, subcommand); err != nil {
 		return fmt.Errorf("error initializing logging: %v", err)
 	}
 

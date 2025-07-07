@@ -12,7 +12,7 @@ import (
 	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 	"github.com/raphaelreyna/metashell/pkg/plugin/proto/shared"
 
-	. "github.com/raphaelreyna/metashell/internal/log"
+	"github.com/raphaelreyna/metashell/internal/log"
 )
 
 type PluginInfo struct {
@@ -94,14 +94,14 @@ func (p *Plugins) Reload(ctx context.Context) error {
 
 		path := filepath.Join(p.PluginsDir, entry.Name())
 
-		Log.Info().
-			Str("path", path).
-			Msg("checking plugin file")
+		log.Info("checking plugin file",
+			"path", path)
 
 		client := plugin.NewClient(&plugin.ClientConfig{
 			HandshakeConfig: shared.Handshake,
 			Plugins:         shared.PluginMap,
 			Cmd:             exec.Command(path),
+			Logger:          log.GetLogger(),
 			AllowedProtocols: []plugin.Protocol{
 				plugin.ProtocolGRPC,
 			},
@@ -114,51 +114,53 @@ func (p *Plugins) Reload(ctx context.Context) error {
 
 		iface, err := cc.Dispense("daemonPlugin")
 		if err != nil {
-			Log.Warn().
-				Str("path", path).
-				Err(err).
-				Msg("unable to dispense daemonPlugin, skipping")
+			log.Warn("unable to dispense daemonPlugin, skipping",
+				"error", err,
+				"path", path,
+			)
 			continue
 		}
 
 		h, ok := iface.(shared.DaemonPlugin)
 		if !ok {
-			Log.Warn().
-				Str("path", path).
-				Msg("could not cast plugin as daemonPlugin")
+			log.Warn("plugin does not implement daemonPlugin interface, skipping",
+				"path", path,
+			)
 			continue
 		}
 
 		info, err := h.Info(ctx)
 		if err != nil {
-			Log.Warn().
-				Str("path", path).
-				Err(err).
-				Msg("unable to get plugin info, skipping")
+			log.Warn("unable to get plugin info, skipping",
+				"err", err,
+				"path", path,
+			)
 		}
 
 		// Validate plugin info
 		if info == nil {
-			Log.Warn().
-				Str("path", path).
-				Msg("plugin info is nil, skipping")
+			log.Warn("plugin info is nil, skipping",
+				"path", path,
+			)
 			continue
 		}
 		if info.Name == "" {
-			Log.Warn().
-				Str("path", path).
-				Msg("plugin info name is empty, skipping")
+			log.Warn("plugin info name is empty, skipping",
+				"path", path,
+			)
 			continue
 		}
 		// TODO(raphaelreyna): Validate plugin info version
 
 		if err := h.Init(ctx, &proto.PluginConfig{
-			Data: configs[info.Name],
+			Data:     configs[info.Name],
+			LogLevel: log.GetLogLevel(),
+			LogName:  info.Name,
 		}); err != nil {
-			Log.Warn().
-				Str("path", path).
-				Err(err).
-				Msg("error initializing plugin, skipping")
+			log.Warn("error initializing plugin, skipping",
+				"path", path,
+				"error", err,
+			)
 			continue
 		}
 
@@ -175,10 +177,10 @@ func (p *Plugins) Reload(ctx context.Context) error {
 		p.daemonPlugins[info.Name] = h
 		p.info[info.Name] = pi
 
-		Log.Info().
-			Str("path", path).
-			Interface("info", info).
-			Msg("loaded plugin")
+		log.Info("loaded plugin",
+			"name", info.Name,
+			"info", info,
+		)
 	}
 
 	return nil
@@ -186,7 +188,7 @@ func (p *Plugins) Reload(ctx context.Context) error {
 
 func (p *Plugins) CommandReport(ctx context.Context, rep *proto.ReportCommandRequest) error {
 	if len(p.daemonPlugins) == 0 {
-		Log.Info().Msg("no daemonPlugin plugins")
+		log.Info("no daemonPlugin plugins")
 		return nil
 	}
 
@@ -195,8 +197,9 @@ func (p *Plugins) CommandReport(ctx context.Context, rep *proto.ReportCommandReq
 			continue
 		}
 		if err := plugin.ReportCommand(ctx, rep); err != nil {
-			Log.Error().Err(err).
-				Msg("daemonPlugin plugin error")
+			log.Error("daemonPlugin plugin error", err,
+				"plugin", name,
+			)
 		}
 	}
 

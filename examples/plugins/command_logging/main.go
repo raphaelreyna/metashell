@@ -5,32 +5,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
 	json "encoding/json"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/raphaelreyna/metashell/pkg/plugin/log"
 	"github.com/raphaelreyna/metashell/pkg/plugin/proto/proto"
 	"github.com/raphaelreyna/metashell/pkg/plugin/proto/shared"
 )
 
 type handler struct {
-	history     []string
-	stderr      *bytes.Buffer
-	configBytes []byte
+	history []string
+	stderr  *bytes.Buffer
 }
 
 func (h *handler) ReportCommand(ctx context.Context, rep *proto.ReportCommandRequest) error {
-	log.Println("called:: ReportCommand")
+	log.Info("called ReportCommand")
 
 	h.history = append(h.history, rep.Command)
 	return nil
 }
 
 func (h *handler) Metacommand(ctx context.Context, req *proto.MetacommandRequest) (*proto.MetacommandResponse, error) {
-	log.Println("called:: Metacommand")
+	log.Info("called Metacommand")
 
 	var (
 		resp proto.MetacommandResponse
@@ -60,17 +59,18 @@ func (h *handler) Metacommand(ctx context.Context, req *proto.MetacommandRequest
 		err = errors.New(resp.Error)
 	}
 
-	log.Printf("metacommandResponse:: %+v\n", resp.Data)
+	log.Info("metacommand response",
+		"response", string(resp.Data),
+	)
 
 	if err != nil {
-		log.Printf("metacommandError:: %s\n", err.Error())
+		log.Error("metacommand error", err)
 	}
 
 	return &resp, err
 }
 
 func (h *handler) Info(ctx context.Context) (*proto.PluginInfo, error) {
-	log.Println("called:: Info")
 	return &proto.PluginInfo{
 		Name:                  "logging",
 		Version:               "v0.0.1",
@@ -89,7 +89,10 @@ func (h *handler) Info(ctx context.Context) (*proto.PluginInfo, error) {
 }
 
 func (h *handler) Init(ctx context.Context, config *proto.PluginConfig) error {
-	h.configBytes = config.Data
+	log.Init(config)
+	log.Info("called Init",
+		"config", config.Data,
+	)
 	return nil
 }
 
@@ -117,7 +120,6 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	h := &handler{stderr: bytes.NewBuffer(nil)}
-	log.SetOutput(h.stderr)
 
 	go http.ListenAndServe(":8086", h)
 	plugin.Serve(&plugin.ServeConfig{
@@ -127,5 +129,6 @@ func main() {
 		},
 		// A non-nil value here enables gRPC serving for this plugin...
 		GRPCServer: plugin.DefaultGRPCServer,
+		Logger:     log.GetLogger(),
 	})
 }

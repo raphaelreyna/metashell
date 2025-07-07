@@ -5,9 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/raphaelreyna/metashell/internal/log"
 	daemonproto "github.com/raphaelreyna/metashell/internal/rpc/go/daemon"
-
-	. "github.com/raphaelreyna/metashell/internal/log"
 )
 
 type rootScreen interface {
@@ -99,9 +98,9 @@ func (m *Handler) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.newActiveScreen = ""
 			m.newActiveScreenInitData = nil
 		} else {
-			Log.Warn().
-				Str("screen-name", m.newActiveScreen).
-				Msg("could not find screen by name")
+			log.Warn("could not find screen by name",
+				"screen-name", m.newActiveScreen,
+			)
 		}
 	}
 
