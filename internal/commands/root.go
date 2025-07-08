@@ -7,6 +7,7 @@ import (
 	"github.com/raphaelreyna/metashell/internal/commands/daemon"
 	"github.com/raphaelreyna/metashell/internal/commands/install"
 	"github.com/raphaelreyna/metashell/internal/commands/metashell"
+	plugin "github.com/raphaelreyna/metashell/internal/commands/plugin"
 	"github.com/raphaelreyna/metashell/internal/commands/shellclient"
 	"github.com/raphaelreyna/metashell/internal/config"
 	"github.com/spf13/cobra"
@@ -48,6 +49,7 @@ func (c *Cmd) subCommands(config *config.Config) []*cobra.Command {
 		install.New(config).Cobra(),
 		metashell.New(config).Cobra(),
 		shellclient.New(config).Cobra(),
+		plugin.New(config).Cobra(),
 	}
 }
 
