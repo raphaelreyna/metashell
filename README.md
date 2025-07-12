@@ -1,5 +1,7 @@
 # Metashell
 
+![metashell logo](https://github.com/raphaelreyna/metashell/edit/master/misc/images/metashell.png)
+
 Metashell is a wrapper around the shell (`bash` only for now).
 It is able to transparantly capture keystrokes, as well as command exit codes.
 Metashell depends on plugins to do anything useful; plugins receive the events captured by metashell and can act on them and even provide their own output and shell injections.
